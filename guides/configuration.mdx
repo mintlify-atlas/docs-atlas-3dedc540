@@ -1,0 +1,295 @@
+---
+title: Configuration
+description: Configure Buildstory in your git repositories and customize what data gets captured
+---
+
+After authenticating the CLI, you'll initialize Buildstory in each git repository you want to track. This installs a post-commit hook and creates local configuration files.
+
+## Initialize a project
+
+<Steps>
+  <Step title="Navigate to your git repository">
+    ```bash
+    cd your-project
+    ```
+    
+    <Note>
+    Buildstory requires an existing git repository. Run `git init` first if you haven't already.
+    </Note>
+  </Step>
+  
+  <Step title="Run the init command">
+    ```bash
+    buildstory init
+    ```
+    
+    The CLI will detect your project name from `package.json` (if it exists) or use the directory name as a fallback.
+  </Step>
+  
+  <Step title="Confirm project name">
+    You'll be prompted to confirm or modify the project name:
+    ```
+    Project name (my-app): 
+    ```
+    
+    Press Enter to accept, or type a different name.
+  </Step>
+  
+  <Step title="Project created">
+    The CLI will collect project context and create the project on the server:
+    ```
+    Collecting project context...
+    Creating project "my-app" on server...
+    Created .buildstoryignore with default patterns
+    Installed post-commit hook
+
+    Buildstory initialized for "my-app"
+      Project ID: proj_abc123xyz
+      Machine ID: your-hostname-a1b2c3
+      Endpoint:   https://buildstory-cli.vercel.app
+
+    Make a commit to start capturing your build story!
+    ```
+  </Step>
+</Steps>
+
+## Custom endpoint
+
+If you're using a self-hosted instance, specify the endpoint during init:
+
+```bash
+buildstory init --endpoint https://your-instance.example.com
+```
+
+Or set the environment variable before running init:
+
+```bash
+export BUILDSTORY_ENDPOINT=https://your-instance.example.com
+buildstory init
+```
+
+## Configuration files
+
+Initialization creates several files in your repository:
+
+### `.buildstory/config.json` (per-repo)
+
+Stores project-specific settings:
+
+```json
+{
+  "project_id": "proj_abc123xyz",
+  "endpoint": "https://buildstory-cli.vercel.app",
+  "machine_id": "your-hostname-a1b2c3",
+  "created_at": "2024-03-15T10:30:00.000Z"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `project_id` | Unique identifier for this project on the server (prefix: `proj_`) |
+| `endpoint` | API endpoint for sending commit data |
+| `machine_id` | Unique identifier for this machine (hostname + random suffix) |
+| `created_at` | Timestamp when the project was initialized |
+
+<Warning>
+The `.buildstory/` directory is automatically added to `.gitignore`. **Never commit this directory** as it contains machine-specific configuration.
+</Warning>
+
+### `~/.buildstory/credentials.json` (global)
+
+Your authentication token, shared across all projects:
+
+```json
+{
+  "token": "bsk_...",
+  "created_at": "2024-03-15T10:30:00.000Z"
+}
+```
+
+This file is created by `buildstory auth` and used by all projects on your machine.
+
+### `.buildstoryignore` (per-repo)
+
+Glob patterns for files to exclude from commit data. Created automatically during `buildstory init`:
+
+```
+# Buildstory ignore patterns
+# Files matching these patterns will be excluded from commit data
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+bun.lock
+yarn.lock
+Gemfile.lock
+Cargo.lock
+composer.lock
+poetry.lock
+
+# Generated files
+*.min.js
+*.min.css
+*.map
+dist/
+build/
+.next/
+
+# Binary and media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.mp4
+*.mp3
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+```
+
+You can add custom patterns to exclude additional files specific to your project.
+
+<Accordion title="How .buildstoryignore works">
+  The post-commit hook reads this file and skips any files matching the patterns. Patterns support shell globbing:
+  
+  - `*.json` - matches all JSON files
+  - `dist/` - matches the dist directory and all files under it
+  - `.env.*` - matches .env.local, .env.production, etc.
+  
+  Files are excluded from the `files` array in the commit payload entirely - they won't be sent to the server at all.
+</Accordion>
+
+### `.git/hooks/post-commit`
+
+The git hook that runs automatically after each commit. This is a shell script that:
+
+1. Extracts commit metadata (hash, message, author, timestamp)
+2. Collects diff stats (files changed, insertions, deletions)
+3. Builds a JSON payload with file changes
+4. Sends the payload to the Buildstory server
+5. Logs the result to `.buildstory/hook.log`
+
+<Note>
+The hook runs entirely in the background (detached process) to avoid slowing down your commits.
+</Note>
+
+If you already have a post-commit hook, Buildstory appends its hook to the existing file rather than overwriting it.
+
+### `.buildstory/hook.log` (generated)
+
+Activity log created automatically by the post-commit hook:
+
+```
+2024-03-15T10:35:42Z [OK] abc1234 entry=e_def567890 http=200
+2024-03-15T10:40:15Z [OK] def5678 entry=e_ghi123456 http=200
+2024-03-15T10:45:03Z [FAIL] ghi9012 entry=e_jkl789012 http=401 body=Unauthorized
+```
+
+| Status | Meaning |
+|--------|----------|
+| `OK` | Commit successfully delivered to server (HTTP 2xx) |
+| `FAIL` | Failed to deliver commit (HTTP error or network issue) |
+| `SKIP` | Hook skipped execution (missing config or credentials) |
+
+The log auto-rotates when it reaches ~100KB, keeping only the most recent 50KB of entries.
+
+## What data gets sent
+
+Each commit sends the following payload to the Buildstory server:
+
+```json
+{
+  "entry_id": "e_abc123...",
+  "project_id": "proj_xyz789...",
+  "machine_id": "your-hostname-a1b2c3",
+  "content_hash": "sha256...",
+  "commit_data": {
+    "hash": "abc123def456...",
+    "message": "add user profiles",
+    "timestamp": "2024-03-15T10:35:42Z",
+    "author": "John Doe <john@example.com>"
+  },
+  "diff_stats": {
+    "files_changed": 3,
+    "insertions": 45,
+    "deletions": 12
+  },
+  "files": [
+    {
+      "path": "src/components/UserProfile.tsx",
+      "change_type": "added",
+      "insertions": 30,
+      "deletions": 0
+    },
+    {
+      "path": "src/lib/api.ts",
+      "change_type": "modified",
+      "insertions": 10,
+      "deletions": 8
+    }
+  ],
+  "diff_summary": "src/components/UserProfile.tsx | 30 ++++++\nsrc/lib/api.ts | 18 ++-",
+  "environment": {
+    "tool_detected": "cursor",
+    "shell": "zsh",
+    "os": "Darwin"
+  }
+}
+```
+
+<Accordion title="Field descriptions">
+  | Field | Description |
+  |-------|-------------|
+  | `entry_id` | Unique identifier for this commit entry (SHA-256 hash of timestamp + machine_id + commit_hash) |
+  | `project_id` | Project this commit belongs to |
+  | `machine_id` | Machine that created this commit |
+  | `content_hash` | SHA-256 hash of commit_hash + files array (for deduplication) |
+  | `commit_data` | Standard git commit metadata |
+  | `diff_stats` | Overall diff statistics for the commit |
+  | `files` | Per-file change details (excludes files matching .buildstoryignore) |
+  | `diff_summary` | First 50 lines of `git diff --stat` output (secrets redacted) |
+  | `environment` | Detected development environment (Cursor, VS Code, shell, OS) |
+</Accordion>
+
+## Secret redaction
+
+The post-commit hook automatically redacts sensitive data from `diff_summary` before sending:
+
+| Pattern | Replacement |
+|---------|-------------|
+| API keys (sk_, pk_, api_key_...) | `[REDACTED_KEY]` |
+| Tokens (token=..., bearer ...) | `[REDACTED_TOKEN]` |
+| Private keys (-----BEGIN PRIVATE KEY-----) | `[REDACTED_PRIVATE_KEY]` |
+| AWS access keys (AKIA...) | `[REDACTED_AWS_KEY]` |
+| Connection strings (postgres://, mysql://, etc.) | `[REDACTED_CONNECTION_STRING]` |
+
+<Warning>
+While the hook redacts common secret patterns, you should still add sensitive files to `.buildstoryignore` as an extra layer of protection. Files like `.env`, `credentials.json`, etc. are excluded by default.
+</Warning>
+
+## Project context collection
+
+During initialization, the CLI collects project context to help the AI generate a better project overview:
+
+- File tree (directory structure, limited depth)
+- Recent commits (last 10)
+- Package.json contents (if it exists)
+- README snippet (first 500 characters if it exists)
+
+This context is sent once during project creation and stored on the server for generating the initial AI overview.
+
+## Next steps
+
+With configuration complete, you're ready to start using Buildstory in your daily workflow:
+
+- [Day-to-day workflow](/guides/workflow) - Learn how commits are captured and enriched
+- [Troubleshooting](/guides/troubleshooting) - Common issues and solutions

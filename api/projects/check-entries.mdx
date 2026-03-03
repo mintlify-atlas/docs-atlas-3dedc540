@@ -1,0 +1,109 @@
+---
+title: "Check Commit Delivery"
+api: "POST /api/v1/projects/{id}/entries/check"
+description: "Verify which commits have been successfully received by the server"
+---
+
+## Authentication
+
+Accepts either:
+- Bearer token via `Authorization: Bearer <token>` header
+- Supabase session cookie (for dashboard requests)
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID (e.g., `proj_1a2b3c4d5e6f7890`)
+</ParamField>
+
+## Request Body
+
+<ParamField body="commit_hashes" type="array" required>
+  Array of git commit hashes to check (1-50 items). Each item must be a string.
+  
+  Example: `["a1b2c3d4", "e5f6g7h8", "i9j0k1l2"]`
+</ParamField>
+
+## Response
+
+<ResponseField name="found" type="array">
+  Array of commit hashes that exist in the project's raw entries
+</ResponseField>
+
+<ResponseField name="missing" type="array">
+  Array of commit hashes that were not found in the project's raw entries
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://buildstory-cli.vercel.app/api/v1/projects/proj_1a2b3c4d5e6f7890/entries/check \
+  -H "Authorization: Bearer bsk_1234567890abcdef" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "commit_hashes": [
+      "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+      "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1",
+      "c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2"
+    ]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 Success
+{
+  "found": [
+    "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+    "c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2"
+  ],
+  "missing": [
+    "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1"
+  ]
+}
+```
+
+```json 400 Bad Request - Invalid JSON
+{
+  "error": "Invalid JSON"
+}
+```
+
+```json 400 Bad Request - Invalid Array
+{
+  "error": "commit_hashes must be a string array (1-50 items)"
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": "Unauthorized"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "Project not found"
+}
+```
+</ResponseExample>
+
+## Validation Rules
+
+- `commit_hashes` must be an array
+- Array must contain 1-50 items
+- All items must be strings
+- Empty arrays are rejected
+- Arrays with more than 50 items are rejected
+
+## Ownership Verification
+
+- Authenticated user must be the project owner
+- Returns 404 (not 403) if project exists but user is not the owner
+- Legacy API tokens (without user association) skip ownership check
+
+## Use Cases
+
+- CLI `buildstory status` command uses this to verify recent commits were delivered
+- Debugging missing commits from post-commit hook failures
+- Verifying hook installation is working correctly
+- Checking if commits were skipped due to missing credentials or config

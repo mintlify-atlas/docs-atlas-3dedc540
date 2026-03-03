@@ -1,0 +1,202 @@
+---
+title: Dashboard
+description: Manage your projects, review AI-generated drafts, and track commit pipeline status
+---
+
+The Buildstory dashboard is your central hub for managing projects, reviewing AI-enriched updates, and monitoring your commit pipeline.
+
+## Project List
+
+After signing in at `/dashboard`, you'll see all your connected projects:
+
+<Steps>
+  <Step title="View your projects">
+    Each project card shows the project name, description, and status badge (active/inactive).
+  </Step>
+  
+  <Step title="Click a project">
+    Opens the project detail page with pipeline stats and review queue.
+  </Step>
+  
+  <Step title="Connect a new project">
+    Run `buildstory init` in a git repository to create a new project and install the commit hook.
+  </Step>
+</Steps>
+
+### Zero State
+
+If you don't have any projects yet, you'll see instructions to run `buildstory init` in a git repository.
+
+## CLI Setup Card
+
+The dashboard includes a CLI Setup section at the bottom of the project list page. This is where you manage your API keys for CLI authentication.
+
+### Generating an API Key
+
+1. Click **Generate API Key**
+2. Your new key appears in full (starts with `bsk_`)
+3. **Copy and save it immediately** - you won't see it again
+4. The key is stored in `~/.buildstory/credentials.json` when you run `buildstory auth`
+
+<Note>
+  API keys use the prefix `bsk_` followed by 32 hex characters. The dashboard only stores a SHA-256 hash of the full key.
+</Note>
+
+### Regenerating a Key
+
+If you need to regenerate your key (e.g., if it was leaked):
+
+1. Click **Regenerate** next to your existing key
+2. Confirm - this will revoke your current key
+3. Copy the new key and update any systems using the old one
+
+<Warning>
+  Regenerating revokes all existing keys. Any CLI installations or CI systems using the old key will stop working immediately.
+</Warning>
+
+### Quick Start Commands
+
+The CLI Setup card shows three essential commands:
+
+```bash
+npm install -g buildstory
+buildstory auth        # Opens browser to sign in
+buildstory init        # Run inside a git repo
+```
+
+## Project Dashboard
+
+Clicking a project from the list takes you to `/dashboard/[projectId]`, where you can see detailed pipeline statistics and review pending drafts.
+
+### Pipeline Statistics
+
+Three metrics cards at the top show:
+
+<CardGroup cols={3}>
+  <Card title="Commits Received" icon="git-alt">
+    Total number of commits captured by the git hook
+  </Card>
+  <Card title="Awaiting Enrichment" icon="brain">
+    Commits that haven't been processed by AI yet
+  </Card>
+  <Card title="Drafts to Review" icon="inbox">
+    Enriched updates waiting for your approval
+  </Card>
+</CardGroup>
+
+Below the metrics, you'll see:
+- **Last commit received** timestamp and commit hash (first 7 chars)
+- **Enrichment status panel** showing pending enrichment or "all enriched"
+- **Review queue** with all draft updates
+
+### Enrichment Status Panel
+
+This panel appears when commits are waiting to be enriched:
+
+- Shows count of pending commits
+- Displays a countdown timer (enrichment typically happens within 2 minutes)
+- Provides a **Enrich Now** button to trigger manual enrichment (processes up to 10 commits)
+
+Once all commits are enriched, the panel displays "All commits have been enriched."
+
+### Review Queue
+
+The review queue shows all **draft** updates (enriched commits that haven't been approved or dismissed yet).
+
+Each draft card includes:
+
+<ResponseField name="Title" type="editable">
+  Click to edit the AI-generated title inline
+</ResponseField>
+
+<ResponseField name="Description" type="editable">
+  Click to edit the AI-generated description inline
+</ResponseField>
+
+<ResponseField name="Type Badge">
+  Color-coded badge showing the update type (feature, fix, improvement, etc.)
+</ResponseField>
+
+<ResponseField name="Tags">
+  Small badges showing extracted tags (technologies, file paths, concepts)
+</ResponseField>
+
+<ResponseField name="Diff Stats">
+  Files changed, insertions (+), deletions (-), commit hash, and date
+</ResponseField>
+
+<ResponseField name="Decision Note" type="input">
+  Optional text field to add context about why you're approving this update
+</ResponseField>
+
+<ResponseField name="Actions">
+  **Approve** (adds to timeline) or **Dismiss** (hides from timeline)
+</ResponseField>
+
+### Editing Drafts
+
+To edit a draft:
+
+1. **Click the title** to edit inline - changes save when you click outside or press Enter
+2. **Click the description** to edit inline - same behavior
+3. Edits are saved immediately via `PATCH /api/v1/updates/[entryId]`
+
+<Info>
+  You can only edit **title** and **description**. Type, tags, and stats are generated from the commit data and can't be changed.
+</Info>
+
+### Bulk Actions
+
+If you have multiple drafts, the **Bulk Actions** bar appears at the top:
+
+- Shows count of drafts in the queue
+- **Approve All** button to approve all drafts at once (max 100 per request)
+- Success toast shows how many drafts were approved
+
+This is useful when you have a batch of commits from a focused work session that you trust.
+
+### Zero State
+
+If you don't have any drafts to review, you'll see:
+
+> No drafts to review.  
+> New commits will appear here after enrichment.
+
+This means either:
+- No commits have been received yet (check pipeline stats)
+- All commits are still awaiting enrichment
+- All enriched updates have been approved or dismissed
+
+## View Timeline
+
+Click **View Timeline** in the project header to see your public timeline at `/dashboard/[projectId]/timeline`.
+
+This shows only **approved** updates, grouped by day, with client-side type filtering.
+
+## Debug View (Admin Only)
+
+If you're an admin (email in `ADMIN_EMAILS` env var), you'll see a **Debug** button in the project header.
+
+The debug view at `/dashboard/[projectId]/debug` shows:
+
+- Last 30 raw entries with enrichment status
+- Summary stats (total, enriched, unenriched, avg enrichment time)
+- Expandable rows showing full raw payload and AI enrichment output
+
+This is useful for:
+- Diagnosing enrichment failures
+- Inspecting what data the AI received
+- Verifying commit hook delivery
+
+<Note>
+  Non-admin users are redirected to the project page if they try to access `/debug`.
+</Note>
+
+## Navigation
+
+Every dashboard page includes:
+
+- **Breadcrumb navigation** - Projects / [Project Name] / Timeline
+- **Theme toggle** - Switch between light, dark, or system theme
+- **Sign out** button (on main dashboard)
+- **All Projects** button (on timeline/project pages)

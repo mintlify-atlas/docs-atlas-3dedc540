@@ -1,0 +1,88 @@
+---
+title: "Bulk Approve Updates"
+api: "POST /api/v1/updates/bulk-approve"
+description: "Approve multiple draft updates in a single request"
+---
+
+## Authentication
+
+Requires Supabase session authentication (cookie-based). User must own the projects these updates belong to.
+
+## Request Body
+
+<ParamField body="entry_ids" type="array" required>
+  Array of entry IDs to approve (format: `e_*`)
+  
+  **Minimum items:** 1  
+  **Maximum items:** 100
+  
+  All items must be strings.
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">
+  Returns "ok" on success
+</ResponseField>
+
+<ResponseField name="approved" type="number">
+  Number of updates successfully approved
+</ResponseField>
+
+<RequestExample>
+```bash
+curl -X POST https://buildstory-cli.vercel.app/api/v1/updates/bulk-approve \
+  -H "Cookie: your-session-cookie" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entry_ids": [
+      "e_xyz789",
+      "e_abc456",
+      "e_def123"
+    ]
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "status": "ok",
+  "approved": 3
+}
+```
+</ResponseExample>
+
+## Behavior
+
+- Approves all matching draft updates in a single database transaction
+- Sets status to `"approved"` for each entry
+- Records the approval timestamp in `approved_at`
+- Updates the `updated_at` timestamp for each entry
+- Only processes entries that are currently in draft status
+- Skips entries that don't exist or are already processed
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+| Status Code | Error Message | Description |
+|-------------|---------------|-------------|
+| 400 | "entry_ids must be a string array (1-100 items)" | Invalid request body format, empty array, too many items, or non-string values |
+| 401 | "Unauthorized" | No valid session |
+| 404 | "Draft not found or already processed" | None of the provided entry IDs matched draft updates |
+| 500 | "Internal server error" | Database or server error |
+
+## Limits
+
+- Minimum: 1 entry ID
+- Maximum: 100 entry IDs per request
+- For larger batches, split into multiple requests
+
+## Notes
+
+- The `approved` count in the response may be less than the number of entry IDs provided if some entries were not found or already processed
+- All approved updates will appear on the public timeline immediately
+- The operation is atomic - either all matching drafts are approved or none are (on database errors)

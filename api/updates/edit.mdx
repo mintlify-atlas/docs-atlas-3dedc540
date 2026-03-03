@@ -1,0 +1,88 @@
+---
+title: "Edit Draft Update"
+api: "PATCH /api/v1/updates/{entryId}"
+description: "Edit the title, description, or decision of a draft update"
+---
+
+## Authentication
+
+Requires Supabase session authentication (cookie-based). User must own the project this update belongs to.
+
+## Path Parameters
+
+<ParamField path="entryId" type="string" required>
+  Entry ID of the draft to edit (format: `e_*`)
+</ParamField>
+
+## Request Body
+
+At least one field is required. All fields are optional but you must provide at least one.
+
+<ParamField body="title" type="string" optional>
+  Updated title for the update
+  
+  **Maximum length:** 500 characters
+</ParamField>
+
+<ParamField body="description" type="string" optional>
+  Updated description for the update
+  
+  **Maximum length:** 5000 characters
+</ParamField>
+
+<ParamField body="decision" type="string | null" optional>
+  Updated decision or rationale. Set to `null` to clear.
+  
+  **Maximum length:** 1000 characters
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">
+  Returns "ok" on success
+</ResponseField>
+
+<RequestExample>
+```bash
+curl -X PATCH https://buildstory-cli.vercel.app/api/v1/updates/e_xyz789 \
+  -H "Cookie: your-session-cookie" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Add OAuth2 authentication flow",
+    "description": "Implemented OAuth2 authentication with Google, GitHub, and Azure AD providers, including session management, token refresh logic, and PKCE flow for enhanced security.",
+    "decision": "Chose OAuth2 over basic auth for better security and to support social login providers"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "status": "ok"
+}
+```
+</ResponseExample>
+
+## Character Limits
+
+| Field | Maximum Length |
+|-------|---------------|
+| title | 500 characters |
+| description | 5000 characters |
+| decision | 1000 characters |
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+| Status Code | Error Message | Description |
+|-------------|---------------|-------------|
+| 400 | "title must be a string (max 500 chars)" | Title validation failed |
+| 400 | "description must be a string (max 5000 chars)" | Description validation failed |
+| 400 | "decision must be a string (max 1000 chars) or null" | Decision validation failed |
+| 400 | "At least one field (title, description, decision) is required" | No fields provided in request |
+| 401 | "Unauthorized" | No valid session |
+| 404 | "Draft not found or already processed" | Entry doesn't exist or is no longer in draft status |
+| 500 | "Internal server error" | Database or server error |

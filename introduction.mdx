@@ -1,0 +1,138 @@
+---
+title: Introduction
+description: Automatically capture the story of what you build with AI-powered commit enrichment
+---
+
+# Welcome to Buildstory
+
+Buildstory automatically captures the story of what you build. A CLI installs a git post-commit hook that ships commit metadata to a server, which uses AI to enrich raw commits into human-readable project updates. A web dashboard lets you review, approve, and publish a public timeline of your work.
+
+<CardGroup cols={2}>
+  <Card
+    title="AI-Powered Enrichment"
+    icon="sparkles"
+    href="#how-it-works"
+  >
+    Transform vague commit messages into clear, descriptive updates using Claude
+  </Card>
+  <Card
+    title="Automatic Capture"
+    icon="git-alt"
+    href="/quickstart"
+  >
+    Silent post-commit hook runs in background without slowing down your workflow
+  </Card>
+  <Card
+    title="Review & Approve"
+    icon="check-circle"
+    href="#review-workflow"
+  >
+    Review AI-generated updates in the dashboard before publishing to your timeline
+  </Card>
+  <Card
+    title="Public Timeline"
+    icon="timeline"
+    href="#public-timeline"
+  >
+    Share a clean, human-readable timeline of your project's evolution
+  </Card>
+</CardGroup>
+
+## How It Works
+
+Buildstory transforms raw git commits into polished project updates through a simple four-step process:
+
+<Steps>
+  <Step title="Capture">
+    A git post-commit hook silently ships commit metadata to the Buildstory server after each commit. The hook runs entirely in the background to avoid slowing down your commits.
+  </Step>
+  
+  <Step title="Enrich">
+    Claude analyzes the commit data (message, files changed, diff stats) and generates a clear title, description, type classification, and relevant tags.
+  </Step>
+  
+  <Step title="Review">
+    AI-enriched updates appear in your dashboard as drafts. Review, edit, approve, or dismiss them before they go live.
+  </Step>
+  
+  <Step title="Publish">
+    Approved updates appear on your public timeline, creating a clean narrative of your project's development.
+  </Step>
+</Steps>
+
+## What Data Gets Sent
+
+Each commit sends the following to the Buildstory server:
+
+- Commit hash, message, timestamp, and author
+- Diff stats (files changed, insertions, deletions)
+- List of changed files with per-file stats
+- A truncated diff summary (first 50 lines of `git diff --stat`)
+- Detected environment (Cursor, VS Code, shell, OS)
+
+<Note>
+**Secret redaction**: The hook automatically redacts API keys, tokens, private keys, AWS keys, and connection strings from diff summaries before sending.
+
+Files matching patterns in `.buildstoryignore` are excluded from the payload entirely.
+</Note>
+
+## Review Workflow
+
+When the AI enriches a commit, it creates a draft update that includes:
+
+- **Title**: A clear, specific description of what was done (5-12 words)
+- **Description**: 1-3 sentences explaining what changed, why it matters, and notable technical details
+- **Type**: Categorized as `feature`, `fix`, `improvement`, `refactor`, `setup`, or `research`
+- **Tags**: 2-5 tags extracted from file paths, technologies, or concepts
+
+From the dashboard, you can:
+
+- **Approve** updates to publish them to your timeline
+- **Edit** the title or description before approving
+- **Dismiss** updates that aren't worth publishing
+- **Bulk approve** multiple drafts at once
+
+## Public Timeline
+
+Your public timeline shows approved updates grouped by day and filtered by type. By default, it displays only "feature" updates, but viewers can toggle to see fixes, improvements, and other types.
+
+The timeline also includes an AI-generated project overview (1-3 sentences) that automatically refreshes as your project evolves.
+
+## Configuration Files
+
+<AccordionGroup>
+  <Accordion title="~/.buildstory/credentials.json">
+    Global authentication token stored after running `buildstory auth`. Used by the post-commit hook to authenticate with the server.
+  </Accordion>
+
+  <Accordion title=".buildstory/config.json">
+    Per-repository configuration containing your project ID, API endpoint, and machine ID. Created when you run `buildstory init`.
+  </Accordion>
+
+  <Accordion title=".buildstoryignore">
+    Glob patterns for files to exclude from commit data. Automatically created with sensible defaults (lock files, generated files, binaries, secrets).
+  </Accordion>
+
+  <Accordion title=".buildstory/hook.log">
+    Activity log for the post-commit hook. Each entry shows timestamp, status (OK/FAIL/SKIP), commit hash, and HTTP response. Auto-rotates at ~100KB.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get your first commit captured in under 5 minutes
+  </Card>
+  <Card
+    title="CLI Reference"
+    icon="terminal"
+    href="/cli/overview"
+  >
+    Explore all available commands and options
+  </Card>
+</CardGroup>

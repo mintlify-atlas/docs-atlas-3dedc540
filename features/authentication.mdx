@@ -1,0 +1,320 @@
+---
+title: Authentication
+description: How Buildstory authenticates CLI, git hooks, and dashboard sessions
+---
+
+Buildstory uses three authentication mechanisms depending on the context: browser-based CLI auth, API keys for hooks, and Supabase sessions for the dashboard.
+
+## Browser-Based CLI Auth
+
+The recommended way to authenticate the CLI is with `buildstory auth`, which uses a browser-based OAuth-style flow.
+
+### How It Works
+
+<Steps>
+  <Step title="CLI creates auth session">
+    `buildstory auth` sends a `POST` request to `/api/v1/cli/auth` with your hostname, creating a session record in the `cli_auth_sessions` table with `status: pending`.
+  </Step>
+  
+  <Step title="Browser opens">
+    Your default browser opens to `/cli/auth?session_id=<id>`. The CLI displays the URL in case your browser doesn't auto-open.
+  </Step>
+  
+  <Step title="You sign in">
+    If you're not already signed in, you're redirected to `/login`. After signing in, you return to the CLI auth page.
+  </Step>
+  
+  <Step title="You authorize">
+    Click **Authorize** on the approval page. This sends a `POST` to `/api/v1/cli/auth/approve`, which:
+    - Generates a new API key for you (without revoking existing keys)
+    - Updates the session to `status: approved`
+    - Stores the API key in the session record
+  </Step>
+  
+  <Step title="CLI polls for token">
+    The CLI polls `GET /api/v1/cli/auth?session_id=<id>` every 2 seconds (5-minute timeout). Once the session is approved, the API returns the token.
+  </Step>
+  
+  <Step title="Token saved locally">
+    The CLI saves the token to `~/.buildstory/credentials.json` and marks the session as `consumed`.
+  </Step>
+</Steps>
+
+### Session Lifecycle
+
+CLI auth sessions have three statuses:
+
+- **pending** - Created, waiting for user approval
+- **approved** - User clicked Authorize, token generated
+- **consumed** - CLI retrieved the token
+
+Sessions also have two expiration states:
+
+- **expired** - Session is older than 5 minutes
+- **consumed** - Session was already used (can't be used again)
+
+If a session expires or is already consumed, the CLI will show an error and ask you to run `buildstory auth` again.
+
+### Multi-Device Support
+
+Browser-based auth **does not revoke existing keys**. This allows you to:
+
+- Authenticate on multiple machines (laptop, desktop, CI server)
+- Share API keys across team members (each person runs `buildstory auth`)
+- Keep old installations working when you set up new ones
+
+If you need to revoke all keys (e.g., security incident), regenerate your API key from the dashboard.
+
+## API Keys
+
+API keys are the core authentication mechanism for CLI and git hook requests. They start with `bsk_` followed by 32 hex characters.
+
+### Key Storage
+
+Buildstory never stores the raw key. Instead:
+
+1. When generated, the full key (`bsk_...`) is shown once
+2. A **SHA-256 hash** of the key is stored in the `api_keys` table
+3. The **first 8 characters** are stored as `key_prefix` for display
+4. The raw key is **never retrievable** after generation
+
+### Key Validation
+
+When a request arrives with `Authorization: Bearer <token>`:
+
+1. The token is hashed with SHA-256
+2. The hash is looked up in the `api_keys` table
+3. If found and `revoked_at` is null, the user is authenticated
+4. The `last_used_at` timestamp is updated (fire-and-forget)
+
+### Generating Keys
+
+You can generate API keys two ways:
+
+<Tabs>
+  <Tab title="Dashboard (Recommended)">
+    1. Go to `/dashboard`
+    2. Scroll to **CLI Setup** card
+    3. Click **Generate API Key**
+    4. Copy the full key (starts with `bsk_`)
+    5. Run `buildstory auth --token <key>` to save it
+    
+    **Behavior:** Revokes all existing keys (only one active key per user)
+  </Tab>
+  
+  <Tab title="CLI Browser Auth">
+    1. Run `buildstory auth` (no flags)
+    2. Browser opens and you click Authorize
+    3. Key is generated and automatically saved to `~/.buildstory/credentials.json`
+    
+    **Behavior:** Does NOT revoke existing keys (multi-device friendly)
+  </Tab>
+</Tabs>
+
+### Revoking Keys
+
+To revoke a key:
+
+1. Go to `/dashboard`
+2. Find your key in the **CLI Setup** card (shows `bsk_xxxx...`)
+3. Click **Regenerate** → **Confirm**
+4. Copy the new key and update any systems using the old one
+
+Revocation is a **soft delete** - the `revoked_at` timestamp is set, but the record remains in the database.
+
+<Warning>
+  Regenerating your API key immediately revokes all existing keys. Any git hooks or CI systems using the old key will fail until you update them.
+</Warning>
+
+## Legacy Token (Env Var)
+
+Before per-user API keys existed, Buildstory used a shared secret in the `BUILDSTORY_API_TOKEN` environment variable.
+
+This still works as a **fallback** for backward compatibility:
+
+1. API key validation runs first
+2. If no API key matches, check if `token === process.env.BUILDSTORY_API_TOKEN`
+3. If it matches, authenticate with `userId: null`
+
+Because `userId` is null, ownership checks are skipped (legacy tokens have admin-like access).
+
+<Note>
+  Legacy tokens are deprecated. Use per-user API keys for better security and ownership tracking.
+</Note>
+
+## Supabase Session Auth
+
+The web dashboard uses **Supabase Auth** with email/password sign-in.
+
+### How It Works
+
+1. User visits `/login`
+2. Enters email and password
+3. Supabase validates credentials and creates a session
+4. Session cookie is set (managed by Supabase client)
+5. Protected routes check session via middleware
+
+### Middleware Protection
+
+The Next.js middleware at `/src/middleware.ts` protects all `/dashboard/*` routes:
+
+```typescript
+export const config = {
+  matcher: ["/dashboard/:path*"],
+};
+```
+
+If the user is not authenticated, they're redirected to `/login?next=<path>` for post-login redirect.
+
+### Session Clients
+
+There are three Supabase client variants:
+
+<CardGroup cols={3}>
+  <Card title="Server Client" icon="server">
+    `createClient()` from `@/lib/supabase/server`
+    
+    - Used in Server Components
+    - Reads session from cookies
+    - Respects RLS policies
+  </Card>
+  
+  <Card title="Admin Client" icon="lock-open">
+    `createAdminClient()` from `@/lib/supabase/admin`
+    
+    - Used in API routes for hook data
+    - Uses service role key
+    - **Bypasses RLS** (use carefully)
+  </Card>
+  
+  <Card title="Browser Client" icon="browser">
+    `createClient()` from `@/lib/supabase/client`
+    
+    - Used in Client Components
+    - Reads session from localStorage
+    - Respects RLS policies
+  </Card>
+</CardGroup>
+
+### Sign Out
+
+The dashboard header includes a sign-out form:
+
+```html
+<form action="/api/auth/signout" method="post">
+  <button type="submit">Sign out</button>
+</form>
+```
+
+This calls the Supabase `signOut()` method and clears the session cookie.
+
+## Row-Level Security (RLS)
+
+Supabase RLS policies enforce ownership and visibility rules:
+
+### Projects Table
+
+- **Public read** - Anyone can read project metadata (for public timelines)
+- **Owner write** - Only `owner_id === auth.uid()` can update/delete
+
+### Raw Entries Table
+
+- **Owner read** - Only project owner can read raw commit data
+- **Admin write** - Only API routes with admin client can insert (bypasses RLS)
+
+### Enriched Updates Table
+
+- **Public read** - Anyone can read `status = 'approved'` updates
+- **Owner read** - Project owner can read all statuses (draft, approved, dismissed)
+- **Owner update** - Special two-policy setup:
+  - **USING clause** restricts to `status = 'draft'` rows only
+  - **WITH CHECK clause** allows transitions to draft/approved/dismissed
+
+<Info>
+  The WITH CHECK clause is critical. Without it, Postgres reuses the USING clause for new-row validation, silently blocking status transitions.
+</Info>
+
+### API Keys Table
+
+- **Owner read** - `user_id === auth.uid()`
+- **Owner insert** - Can create keys for self
+- **Owner update** - Can revoke own keys
+
+### CLI Auth Sessions Table
+
+- **No RLS** - Admin client only, not accessible to users
+
+## API Route Auth Patterns
+
+API routes use different auth strategies:
+
+### Bearer Token Routes
+
+Used by CLI and git hooks:
+
+```typescript
+import { validateBearerToken } from "@/lib/api-auth";
+
+const { authenticated, userId } = await validateBearerToken(request);
+
+if (!authenticated) {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+// Verify ownership if userId is not null
+if (userId && project.owner_id !== userId) {
+  return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+}
+```
+
+Routes: `/api/v1/ingest`, `/api/v1/projects`, `/api/v1/projects/[id]`, `/api/v1/projects/[id]/entries/check`
+
+### Session Routes
+
+Used by dashboard pages:
+
+```typescript
+import { getAuthUser } from "@/lib/api-auth";
+
+const user = await getAuthUser();
+
+if (!user) {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+```
+
+Routes: `/api/v1/updates/*`, `/api/v1/projects/[id]/drafts`, `/api/v1/projects/[id]/timeline`, `/api/v1/api-keys`
+
+### Hybrid Routes
+
+Accept both bearer token and session:
+
+```typescript
+const authHeader = request.headers.get("authorization");
+
+if (authHeader?.startsWith("Bearer ")) {
+  const { authenticated, userId } = await validateBearerToken(request);
+  // ...
+} else {
+  const user = await getAuthUser();
+  // ...
+}
+```
+
+Routes: `/api/v1/projects/[id]` (stats endpoint), `/api/v1/health` (with token)
+
+### Cron Routes
+
+Protected by `CRON_SECRET`:
+
+```typescript
+import { validateCronSecret } from "@/lib/api-auth";
+
+if (!validateCronSecret(request)) {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+```
+
+Route: `/api/cron/enrich`
+
+Vercel automatically sends `Authorization: Bearer <CRON_SECRET>` when triggering cron jobs.

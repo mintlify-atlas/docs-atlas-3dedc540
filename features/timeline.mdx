@@ -1,0 +1,185 @@
+---
+title: Public Timeline
+description: Share a filtered, public timeline of approved project updates
+---
+
+The public timeline is where approved updates are displayed for sharing. It shows only the updates you've explicitly approved, grouped by day, with client-side filtering by update type.
+
+## Accessing the Timeline
+
+From your project dashboard at `/dashboard/[projectId]`, click **View Timeline** to open `/dashboard/[projectId]/timeline`.
+
+<Info>
+  The timeline URL is **publicly accessible** via RLS policies, but only displays **approved** updates. Draft and dismissed updates never appear on the timeline.
+</Info>
+
+## Timeline Layout
+
+The timeline page includes:
+
+### 1. Project Header
+
+Displays:
+- Project name and status badge
+- Total count of approved updates
+- Breadcrumb navigation back to Review Queue and All Projects
+
+### 2. Project Overview Card
+
+An AI-generated 1-3 sentence summary of what the project is and does.
+
+<Tabs>
+  <Tab title="For Project Owners">
+    You can:
+    - **Edit** the overview manually (max 280 characters)
+    - **Regenerate** to create a new AI-generated overview from your latest 30 enriched entries
+    - See the overview even if it hasn't been generated yet (shows empty state with "Generate Overview" button)
+    
+    The overview is generated automatically when you have 5+ enriched entries, and refreshes after 20 new entries (unless you've edited it manually).
+  </Tab>
+  
+  <Tab title="For Non-Owners">
+    You only see the overview if one has been generated. If the project owner hasn't set an overview, this card doesn't appear.
+  </Tab>
+</Tabs>
+
+### 3. Type Filter Chips
+
+Clickable badges showing each update type and the count of approved updates:
+
+- **Feature** (green)
+- **Fix** (red)
+- **Improvement** (blue)
+- **Refactor** (purple)
+- **Setup** (gray)
+- **Research** (amber)
+
+**Default filter:** Only "Feature" updates are shown when you first open the timeline.
+
+Click a chip to toggle that type on/off. You can select multiple types to show them together.
+
+<Note>
+  Type chips only appear if you have at least one approved update of that type.
+</Note>
+
+### 4. Daily Cards (Grouped Updates)
+
+Approved updates are grouped by day, with each day card showing:
+
+- **Date header** (e.g., "March 3, 2026")
+- **Aggregated diff stats** for the day (total files changed, insertions, deletions)
+- **List of updates** for that day
+
+Each update entry includes:
+
+<CardGroup cols={2}>
+  <Card title="Title & Type" icon="heading">
+    Update title with color-coded type badge
+  </Card>
+  <Card title="Description" icon="align-left">
+    1-3 sentence summary of what changed and why it matters
+  </Card>
+  <Card title="Tags" icon="tags">
+    Technology/concept tags (e.g., "api", "auth", "ui")
+  </Card>
+  <Card title="Metadata" icon="clock">
+    Timestamp, commit hash (7 chars), files/lines changed
+  </Card>
+</CardGroup>
+
+If you added a **decision note** when approving the update, it appears below the description in italics.
+
+## Filtering Behavior
+
+The timeline uses **client-side filtering** (no page reload):
+
+1. All approved updates are loaded from `/api/v1/projects/[id]/timeline`
+2. JavaScript filters by selected types
+3. Updates are re-grouped by day after filtering
+4. Daily stats are recalculated for visible updates only
+
+### Filter States
+
+<AccordionGroup>
+  <Accordion title="Default: Feature only">
+    When you first load the timeline, only "Feature" type updates are shown. This provides a high-level view of new capabilities.
+  </Accordion>
+  
+  <Accordion title="No filters selected">
+    If you toggle off all types, you'll see:
+    
+    > No updates match the selected filters.  
+    > Toggle more types above to see additional updates.
+  </Accordion>
+  
+  <Accordion title="No approved updates yet">
+    If you haven't approved any updates, you'll see:
+    
+    > No approved updates yet.  
+    > Approve drafts in the review queue to build your timeline.
+  </Accordion>
+</AccordionGroup>
+
+## Sharing Your Timeline
+
+The timeline URL follows the pattern:
+
+```
+https://buildstory-cli.vercel.app/dashboard/[projectId]/timeline
+```
+
+Because of Supabase RLS policies:
+- **Approved updates** with `status = 'approved'` are publicly readable
+- **Draft and dismissed updates** are only visible to the project owner
+- Anyone with the URL can view the timeline
+
+<Tip>
+  Add the timeline URL to your project README, portfolio site, or share it with collaborators to show what you've been building.
+</Tip>
+
+## Project Overview Generation
+
+The project overview at the top of the timeline is generated automatically:
+
+### Initial Generation
+
+- Triggered when you run `buildstory init` (uses repo context: file tree, README, package.json, recent commits)
+- Auto-generated after you have 5+ enriched entries (uses update titles, descriptions, types, tags)
+
+### Auto-Refresh
+
+The overview auto-refreshes after 20 new enriched entries, **unless** you've manually edited it. The system computes a hash of your latest 30 enriched entries and compares it to the stored hash to detect staleness.
+
+### Manual Control
+
+As the project owner, you can:
+
+- **Edit manually** - Click "Edit", enter your own overview (max 280 chars), click "Save"
+  - Sets `overview_edited = true` to prevent auto-overwrite
+- **Regenerate** - Click "Regenerate" to create a fresh AI-generated overview from your latest 30 entries
+  - Clears the `overview_edited` flag, allowing future auto-refreshes
+
+<Info>
+  Manually editing the overview prevents automatic regeneration. Use "Regenerate" if you want to go back to AI-generated overviews.
+</Info>
+
+## Timeline vs Review Queue
+
+Understanding the difference:
+
+| Feature | Review Queue | Timeline |
+|---------|--------------|----------|
+| **Location** | `/dashboard/[projectId]` | `/dashboard/[projectId]/timeline` |
+| **Visibility** | Owner only | Public (anyone with URL) |
+| **Content** | Draft updates | Approved updates |
+| **Filtering** | No filters | Type filters |
+| **Actions** | Approve, Edit, Dismiss | View only (owners can edit overview) |
+| **Grouping** | Chronological list | Grouped by day |
+
+## Dark Mode
+
+The timeline respects your theme preference (light, dark, or system). Use the **theme toggle** button in the header to switch modes.
+
+Type filter chip colors automatically adapt to the active theme:
+- Light mode: pastel backgrounds with darker text
+- Dark mode: darker backgrounds with lighter text

@@ -1,0 +1,183 @@
+---
+title: 'buildstory init'
+description: 'Initialize Buildstory in a git repository'
+icon: 'rocket'
+---
+
+Initialize Buildstory in your current git repository. This command sets up project tracking, installs the post-commit hook, and creates the necessary configuration files.
+
+## Usage
+
+```bash
+buildstory init [options]
+```
+
+## Prerequisites
+
+- Must be run inside a git repository (`.git/` directory must exist)
+- Must be authenticated (run `buildstory auth` first)
+
+## What It Does
+
+1. **Verifies git repository** - Checks for `.git/` directory
+2. **Checks credentials** - Ensures you're authenticated
+3. **Detects project name** - Uses `package.json` name or directory name
+4. **Collects project context** - Gathers file tree, recent commits, package.json, README snippet
+5. **Creates project on server** - Registers project with Buildstory API
+6. **Creates configuration** - Sets up `.buildstory/config.json`
+7. **Creates ignore file** - Generates `.buildstoryignore` with default patterns
+8. **Installs git hook** - Adds post-commit hook to `.git/hooks/`
+9. **Updates .gitignore** - Adds `.buildstory/` to prevent committing local config
+
+## Interactive Prompts
+
+### Project Name
+
+The CLI will detect your project name from `package.json` or use the directory name:
+
+```bash
+Project name (my-app): 
+```
+
+Press Enter to accept the default, or type a custom name.
+
+## Example Output
+
+```bash
+Collecting project context...
+Creating project "my-app" on server...
+Created .buildstoryignore with default patterns
+Installed post-commit hook
+
+Buildstory initialized for "my-app"
+  Project ID: proj_abc123xyz
+  Machine ID: hostname-a1b2c3
+  Endpoint:   https://buildstory-cli.vercel.app
+
+Make a commit to start capturing your build story!
+```
+
+## Options
+
+<ParamField path="-e, --endpoint" type="string" default="https://buildstory-cli.vercel.app">
+  Override the API endpoint URL. Can also be set via the `BUILDSTORY_ENDPOINT` environment variable.
+  
+  **Example:**
+  ```bash
+  buildstory init --endpoint https://custom.buildstory.app
+  ```
+</ParamField>
+
+## Files Created
+
+### `.buildstory/config.json`
+
+Project configuration file containing:
+
+```json
+{
+  "project_id": "proj_abc123xyz",
+  "endpoint": "https://buildstory-cli.vercel.app",
+  "machine_id": "hostname-a1b2c3",
+  "created_at": "2026-03-03T10:30:00.000Z"
+}
+```
+
+### `.buildstoryignore`
+
+Glob patterns for excluding files from commit data. Created with default patterns if it doesn't already exist.
+
+### `.git/hooks/post-commit`
+
+Git hook that runs after each commit. If a post-commit hook already exists, the Buildstory hook is appended rather than overwriting.
+
+## Project Context Collection
+
+During initialization, the CLI collects:
+
+- **File tree** - Repository structure
+- **Recent commits** - Last few commit messages
+- **package.json** - Project metadata and dependencies
+- **README snippet** - First portion of README for context
+
+This context is sent to the server for initial AI overview generation.
+
+## Git Hook Installation
+
+### New Hook
+
+If no post-commit hook exists:
+
+```bash
+#!/bin/sh
+
+[buildstory hook script]
+```
+
+### Existing Hook
+
+If a post-commit hook already exists, Buildstory appends its script:
+
+```bash
+[existing hook content]
+
+# --- Buildstory hook ---
+[buildstory hook script]
+```
+
+The hook is made executable (`chmod 755`).
+
+## .gitignore Updates
+
+The command automatically adds `.buildstory/` to your `.gitignore` file (or creates one if it doesn't exist) to prevent committing local configuration.
+
+## Error Handling
+
+### Not a Git Repository
+
+```
+Error: Not a git repository. Run `git init` first, or cd into a git repo.
+```
+
+### Not Authenticated
+
+```
+Error: Not authenticated. Run `buildstory auth` first.
+```
+
+### Server Connection Errors
+
+```
+Error connecting to server: Failed to fetch
+```
+
+### Project Creation Errors
+
+```
+Error creating project: 500 Internal server error
+```
+
+## Machine ID
+
+Each initialization creates a unique machine identifier combining:
+- Hostname (from `os.hostname()`)
+- Random 3-byte hex string
+
+Example: `macbook-pro-a1b2c3`
+
+This helps track commits from different development machines.
+
+## Next Steps
+
+After initialization, make a commit to test the setup:
+
+```bash
+git add .
+git commit -m "Test commit"
+```
+
+Then check the status:
+
+```bash
+buildstory status
+```

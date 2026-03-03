@@ -1,0 +1,294 @@
+---
+title: Workflow
+description: How Buildstory captures commits and turns them into human-readable project updates
+---
+
+Buildstory operates seamlessly in the background as you work. Once initialized, it automatically captures every commit and enriches it with AI-generated context.
+
+## The Buildstory lifecycle
+
+Every commit flows through a five-stage pipeline:
+
+<Steps>
+  <Step title="Commit your code">
+    Work normally and commit as usual:
+    
+    ```bash
+    git add .
+    git commit -m "add user profile page"
+    ```
+    
+    Git runs your commit, then triggers the post-commit hook.
+  </Step>
+  
+  <Step title="Hook captures metadata">
+    The Buildstory post-commit hook (installed in `.git/hooks/post-commit`) runs in the background:
+    
+    1. Extracts commit data (hash, message, author, timestamp)
+    2. Collects diff stats (files changed, insertions, deletions)
+    3. Builds a list of changed files with per-file stats
+    4. Filters out files matching `.buildstoryignore` patterns
+    5. Redacts secrets from diff summary
+    6. Sends JSON payload to the server via `POST /api/v1/ingest`
+    
+    The hook runs entirely in the background, so your commit completes instantly without delay.
+    
+    <Note>
+    Hook activity is logged to `.buildstory/hook.log` with OK/FAIL/SKIP status for each commit.
+    </Note>
+  </Step>
+  
+  <Step title="Server enriches with AI">
+    The server receives the commit payload and:
+    
+    1. Stores raw commit data in the `raw_entries` table
+    2. Triggers AI enrichment immediately (via Anthropic Claude)
+    3. Converts raw git data into structured update:
+       - **Title**: Human-readable summary (max 500 chars)
+       - **Description**: Detailed explanation of changes (max 5000 chars)
+       - **Type**: feature, fix, improvement, refactor, setup, or research
+       - **Tags**: Relevant keywords (e.g., "authentication", "UI", "database")
+       - **Toolchain**: Technologies used (e.g., "React", "TypeScript", "Tailwind")
+    4. Stores enriched data in the `enriched_updates` table with status `draft`
+    
+    <Accordion title="Example enrichment transformation">
+      **Raw commit:**
+      ```
+      message: "add user profile page"
+      files: [
+        { path: "src/pages/profile.tsx", change_type: "added", insertions: 120 },
+        { path: "src/components/Avatar.tsx", change_type: "added", insertions: 45 },
+        { path: "src/lib/api.ts", change_type: "modified", insertions: 15, deletions: 3 }
+      ]
+      ```
+      
+      **AI enrichment:**
+      ```json
+      {
+        "title": "Add user profile page with avatar support",
+        "description": "Created a new profile page that displays user information and profile pictures. Implemented a reusable Avatar component with fallback initials. Extended the API client to fetch user profile data.",
+        "type": "feature",
+        "tags": ["user-profile", "UI", "API"],
+        "toolchain": ["React", "TypeScript"]
+      }
+      ```
+    </Accordion>
+  </Step>
+  
+  <Step title="Review drafts on dashboard">
+    Visit your project dashboard at `https://buildstory-cli.vercel.app/dashboard/[projectId]` to see:
+    
+    - **Pipeline stats**: commits received, enriched, awaiting enrichment
+    - **Review queue**: draft updates waiting for approval
+    - **Last commit received**: timestamp and commit hash
+    
+    Each draft shows:
+    - AI-generated title, description, type, tags, toolchain
+    - Original commit hash, message, author, timestamp
+    - Files changed and diff stats
+    
+    <Note>
+    Enrichment typically completes within seconds. If commits are still awaiting enrichment, the dashboard shows a countdown and a manual "Enrich Now" button.
+    </Note>
+  </Step>
+  
+  <Step title="Approve or dismiss updates">
+    For each draft, you have three options:
+    
+    1. **Approve** - Publish the update to your public timeline
+    2. **Edit then approve** - Modify the title, description, or add decision notes
+    3. **Dismiss** - Mark as not relevant for the public timeline
+    
+    <CodeGroup>
+    ```text Single approval
+    Click "Approve" on any draft card
+    ```
+    
+    ```text Bulk approval
+    Select multiple drafts → "Approve Selected"
+    ```
+    
+    ```text Edit before approving
+    Click "Edit" → modify fields → "Save & Approve"
+    ```
+    </CodeGroup>
+    
+    Approved updates change status from `draft` to `approved` and become visible on the public timeline.
+  </Step>
+  
+  <Step title="Public timeline">
+    Your approved updates appear on the public timeline at `https://buildstory-cli.vercel.app/dashboard/[projectId]/timeline`.
+    
+    The timeline:
+    - Groups updates by day
+    - Filters by update type (feature, fix, improvement, etc.)
+    - Defaults to showing only "feature" type updates
+    - Displays AI-generated project overview at the top (if set)
+    
+    <Note>
+    The public timeline is readable by anyone with the URL. Only approved updates are visible - drafts and dismissed updates remain private.
+    </Note>
+  </Step>
+</Steps>
+
+## Daily workflow patterns
+
+### Normal development
+
+```bash
+# Work on your feature
+vim src/components/UserProfile.tsx
+
+# Commit as usual - Buildstory captures automatically
+git add .
+git commit -m "add user profile page"
+
+# Continue working - no extra steps needed
+```
+
+### Batch review session
+
+After a day or week of work:
+
+1. Visit your dashboard
+2. Review the drafts in the queue
+3. Bulk approve relevant updates
+4. Dismiss noise (dependency updates, typo fixes, etc.)
+5. Edit important updates to add context or decision notes
+
+### Checking delivery status
+
+Use `buildstory status` to verify commits are being captured:
+
+```bash
+buildstory status
+```
+
+This shows:
+- Credentials and project config status
+- Git hook installation
+- Server connectivity and auth validity
+- Pipeline stats (commits received, enriched, approved)
+- Hook activity summary (OK/FAIL/SKIP counts)
+- Commit delivery check (last 5 commits)
+
+<Accordion title="Example status output">
+  ```
+  --- Credentials ---
+    Token: bsk_1234... (saved)
+
+  --- Project Config ---
+    Project ID: proj_abc123xyz
+    Endpoint:   https://buildstory-cli.vercel.app
+    Machine ID: your-hostname-a1b2c3
+
+  --- Git Hook ---
+    Post-commit hook: INSTALLED
+
+  --- Connectivity ---
+    Server: REACHABLE (v0.2.0)
+    Auth:   VALID
+    DB:     CONNECTED
+
+  --- Project ---
+    Name: my-app
+    Commits received:     45
+    Enriched:             45
+    Awaiting enrichment:  0
+    Approved updates:     32
+    Pending drafts:       8
+    Last commit received: 5m ago (abc1234)
+
+  --- Hook Activity ---
+    Summary: 45 OK, 0 FAIL, 2 SKIP
+    Last 5 entries:
+      2024-03-15T10:35:42Z [OK] abc1234 entry=e_def567890 http=200
+      2024-03-15T10:30:15Z [OK] def5678 entry=e_ghi123456 http=200
+      2024-03-15T10:25:03Z [OK] ghi9012 entry=e_jkl789012 http=200
+
+  --- Commit Delivery ---
+    [+] abc1234 DELIVERED
+    [+] def5678 DELIVERED
+    [+] ghi9012 DELIVERED
+    [+] jkl3456 DELIVERED
+    [+] mno7890 DELIVERED
+    All recent commits delivered
+
+  All checks passed.
+  ```
+</Accordion>
+
+## Background enrichment
+
+Enrichment happens automatically in two ways:
+
+1. **Immediate** - When the server receives a commit via `/api/v1/ingest`, it triggers enrichment immediately after responding to the hook
+2. **Sweep job** - A cron job runs every 15 minutes to catch any commits that were missed by the immediate enrichment
+
+<Note>
+If enrichment fails (e.g., AI service timeout), the system retries up to 3 times before marking the entry as failed. You can manually trigger enrichment from the dashboard using the "Enrich Now" button.
+</Note>
+
+## Retry protection
+
+The enrichment pipeline includes retry protection to handle transient failures:
+
+- Each raw entry has a `retry_count` (default: 0) and `last_error` field
+- Failed enrichments increment `retry_count` and store the error message
+- Entries with `retry_count >= 3` are skipped by the cron sweep job
+- Manual enrichment from the dashboard bypasses the retry limit
+
+This prevents "poison pill" entries from blocking the pipeline indefinitely.
+
+## Project overview
+
+Buildstory generates an AI project overview (1-3 sentences, max 280 chars) that appears at the top of your public timeline.
+
+### Initial generation
+
+During `buildstory init`, the CLI collects project context (file tree, recent commits, package.json, README) and sends it to the server. The server uses this to generate an initial overview.
+
+### Auto-refresh
+
+The cron enrichment job automatically updates the overview:
+- Once you have >= 5 enriched entries (if no overview exists yet)
+- After >= 20 new entries since the last overview was generated
+
+<Warning>
+Auto-refresh stops if you manually edit the overview. The system sets an `overview_edited` flag to prevent overwriting your custom text.
+</Warning>
+
+### Manual control
+
+From the timeline page, you can:
+- **Regenerate** - Generate a new overview from your latest 30 enriched entries
+- **Edit** - Customize the text manually (prevents auto-refresh)
+
+## Filtering and visibility
+
+The public timeline supports client-side filtering by update type:
+
+- **feature** - New capabilities added (default filter)
+- **fix** - Bug fixes
+- **improvement** - Enhancements to existing features
+- **refactor** - Code restructuring without behavior changes
+- **setup** - Configuration, tooling, infrastructure
+- **research** - Experiments, prototypes, learning
+
+Visitors can click type badges to toggle filters and see different slices of your project history.
+
+## Privacy and control
+
+- **Raw commits** are stored on the server but never exposed publicly
+- **Drafts** are private until you approve them
+- **Dismissed updates** remain in the database but never appear on the timeline
+- **Edit history** is not tracked - edits overwrite the previous version
+- **Public timeline** only shows approved updates
+
+<Note>
+You have full control over what gets published. Buildstory captures everything, but you choose what becomes part of your public build story.
+</Note>
+
+## Next steps
+
+If you encounter issues with commit capture or enrichment, see the [Troubleshooting guide](/guides/troubleshooting) for common problems and solutions.

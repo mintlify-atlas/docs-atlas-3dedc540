@@ -1,0 +1,115 @@
+---
+title: API Overview
+description: Introduction to the Buildstory REST API
+---
+
+## Introduction
+
+The Buildstory REST API enables programmatic access to your project data, commit ingestion, and timeline management. The API is used by the Buildstory CLI and git hooks to send commit data, and can also be used to build custom integrations.
+
+## Base URL
+
+The default production API endpoint is:
+
+```
+https://buildstory-cli.vercel.app
+```
+
+All API routes are prefixed with `/api/v1/`. For example:
+
+```
+https://buildstory-cli.vercel.app/api/v1/health
+```
+
+## Versioning
+
+The API is currently at version `v1`. The version is included in the URL path. Breaking changes will result in a new API version.
+
+## Authentication
+
+Most API endpoints require authentication via Bearer token. See the [Authentication](/api/authentication) page for details on obtaining and using API keys.
+
+## Response Format
+
+All API responses use JSON format. Successful responses include the requested data, while errors return a JSON object with an `error` field:
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes:
+
+- `200 OK` - Request succeeded
+- `201 Created` - Resource created successfully
+- `400 Bad Request` - Invalid request parameters or body
+- `401 Unauthorized` - Missing or invalid authentication
+- `403 Forbidden` - Authenticated but not authorized for this resource
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Server error (details logged server-side)
+
+## Rate Limiting
+
+Currently, there are no enforced rate limits on the API. However, please use the API responsibly to avoid overwhelming the service.
+
+## Health Check
+
+The API provides a health check endpoint that requires no authentication:
+
+```bash
+curl https://buildstory-cli.vercel.app/api/v1/health
+```
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "version": "abc1234",
+  "timestamp": "2026-03-03T12:00:00.000Z"
+}
+```
+
+When called with a Bearer token, the health endpoint also validates authentication and database connectivity:
+
+```bash
+curl -H "Authorization: Bearer bsk_..." \
+  https://buildstory-cli.vercel.app/api/v1/health
+```
+
+Response with authentication:
+
+```json
+{
+  "status": "ok",
+  "version": "abc1234",
+  "timestamp": "2026-03-03T12:00:00.000Z",
+  "auth": "valid",
+  "userId": "user-id-here",
+  "database": "connected"
+}
+```
+
+## Error Handling
+
+For security reasons, internal server errors (5xx status codes) do not expose detailed error messages to clients. Error details are logged server-side and sent to Sentry for monitoring.
+
+Client errors (4xx status codes) may include additional details in the response body:
+
+```json
+{
+  "error": "Invalid payload",
+  "details": {
+    "fieldErrors": {
+      "project_id": ["Required"]
+    }
+  }
+}
+```
+
+## Support
+
+For API support and questions, please visit the [Buildstory GitHub repository](https://github.com/buildstorydev/buildstory) or reach out via the web dashboard.

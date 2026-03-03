@@ -1,0 +1,110 @@
+---
+title: "List Draft Updates"
+api: "GET /api/v1/projects/{id}/drafts"
+description: "Retrieve all draft updates for a project awaiting review"
+---
+
+## Authentication
+
+Requires Supabase session authentication (cookie-based). User must be the project owner.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID (format: `proj_*`)
+</ParamField>
+
+## Response
+
+<ResponseField name="drafts" type="array">
+  Array of draft enriched updates, ordered by timestamp (newest first)
+  
+  <Expandable title="Draft object properties">
+    <ResponseField name="entry_id" type="string">
+      Unique entry identifier (format: `e_*`)
+    </ResponseField>
+    
+    <ResponseField name="project_id" type="string">
+      Project ID this update belongs to
+    </ResponseField>
+    
+    <ResponseField name="title" type="string">
+      AI-generated update title
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Detailed description of the changes
+    </ResponseField>
+    
+    <ResponseField name="decision" type="string | null">
+      Optional decision or rationale for the change
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Update type (feature, fix, improvement, refactor, setup, research)
+    </ResponseField>
+    
+    <ResponseField name="tags" type="array">
+      Array of relevant tags
+    </ResponseField>
+    
+    <ResponseField name="toolchain" type="array">
+      Array of tools/technologies mentioned
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Always "draft" for this endpoint
+    </ResponseField>
+    
+    <ResponseField name="timestamp" type="string">
+      ISO 8601 timestamp of the original commit
+    </ResponseField>
+    
+    <ResponseField name="stats" type="object">
+      Commit statistics (files_changed, insertions, deletions)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash
+curl -X GET https://buildstory-cli.vercel.app/api/v1/projects/proj_abc123/drafts \
+  -H "Cookie: your-session-cookie"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+[
+  {
+    "entry_id": "e_xyz789",
+    "project_id": "proj_abc123",
+    "title": "Add user authentication flow",
+    "description": "Implemented OAuth2 authentication with Google and GitHub providers, including session management and token refresh logic.",
+    "decision": "Chose OAuth2 over basic auth for better security and user experience",
+    "type": "feature",
+    "tags": ["auth", "oauth", "security"],
+    "toolchain": ["next-auth", "typescript"],
+    "status": "draft",
+    "timestamp": "2026-03-03T14:30:00Z",
+    "stats": {
+      "files_changed": 8,
+      "insertions": 245,
+      "deletions": 12
+    }
+  }
+]
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+| Status Code | Description |
+|-------------|-------------|
+| 401 | Unauthorized - No valid session |
+| 404 | Project not found or user is not the owner |
+| 500 | Internal server error |

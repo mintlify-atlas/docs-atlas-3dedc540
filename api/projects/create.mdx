@@ -1,0 +1,108 @@
+---
+title: "Create Project"
+api: "POST /api/v1/projects"
+description: "Create a new project with optional repository context for AI overview generation"
+---
+
+## Authentication
+
+Requires bearer token authentication via `Authorization: Bearer <token>` header.
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Project name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Project description (defaults to empty string if not provided)
+</ParamField>
+
+<ParamField body="context" type="object">
+  Repository context for AI overview generation. Sent by CLI during `buildstory init`.
+  
+  <Expandable title="Context object properties">
+    <ParamField body="total_commits" type="number">
+      Number of commits in repository history
+    </ParamField>
+    
+    <ParamField body="file_tree" type="array">
+      Array of file paths representing repository structure
+    </ParamField>
+    
+    <ParamField body="recent_commits" type="array">
+      Recent commit metadata
+    </ParamField>
+    
+    <ParamField body="package_json" type="object">
+      Parsed package.json contents (if applicable)
+    </ParamField>
+    
+    <ParamField body="readme_snippet" type="string">
+      First portion of README file
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="project_id" type="string">
+  Generated project ID with `proj_` prefix (e.g., `proj_1a2b3c4d5e6f7890`)
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://buildstory-cli.vercel.app/api/v1/projects \
+  -H "Authorization: Bearer bsk_1234567890abcdef" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Project",
+    "description": "A cool web application",
+    "context": {
+      "total_commits": 42,
+      "file_tree": ["src/index.ts", "package.json"],
+      "recent_commits": []
+    }
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 Success
+{
+  "project_id": "proj_1a2b3c4d5e6f7890"
+}
+```
+
+```json 400 Bad Request - Missing Name
+{
+  "error": "name is required"
+}
+```
+
+```json 400 Bad Request - No Users
+{
+  "error": "No users found. Create a user in the web app first."
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": "Unauthorized"
+}
+```
+
+```json 500 Internal Server Error
+{
+  "error": "Internal server error"
+}
+```
+</ResponseExample>
+
+## Behavior
+
+- Generates a unique project ID with `proj_` prefix using cryptographic random bytes
+- Associates project with authenticated user (or falls back to first user for legacy API tokens)
+- If `context` contains commits or file tree data, triggers asynchronous AI overview generation
+- Overview generation runs in background (fire-and-forget) and does not block response
+- Returns 201 status with project ID immediately after database insert succeeds

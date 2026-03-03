@@ -1,80 +1,353 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get your first commit captured and enriched in under 5 minutes
 ---
 
-## Get started in three steps
+# Quickstart Guide
 
-Get your documentation site running locally and make your first customization.
+This guide walks you through setting up Buildstory, capturing your first commit, and viewing the AI-enriched update in the dashboard.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Node.js 18 or higher
+- A git repository
+- A Buildstory account (sign up during authentication)
 
-### Step 2: Deploy your changes
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+Install the Buildstory CLI globally:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```bash
+npm install -g buildstory
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Verify the installation:
 
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```bash
+buildstory --version
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+You can also use `npx buildstory` if you prefer not to install globally.
 </Note>
+
+## Step 1: Authenticate
+
+Run the `auth` command to authenticate with Buildstory:
+
+```bash
+buildstory auth
+```
+
+This will:
+1. Open your browser to the Buildstory authentication page
+2. Prompt you to sign up or log in
+3. Ask you to authorize the CLI
+4. Save your API key to `~/.buildstory/credentials.json`
+
+<CodeGroup>
+
+```bash Terminal Output
+Opening browser for authentication...
+
+If your browser didn't open, visit this URL:
+
+  https://buildstory-cli.vercel.app/cli/auth?session_id=a1b2c3...
+
+⠋ Waiting for authorization... (3s)
+✓ Authenticated as your@email.com
+  API key saved to ~/.buildstory/credentials.json
+```
+
+</CodeGroup>
+
+<Accordion title="Alternative: Direct token authentication (for CI/scripting)">
+If you're setting up Buildstory in a CI environment or want to use a token directly:
+
+```bash
+buildstory auth --token bsk_your_api_key_here
+```
+
+This bypasses the browser flow and saves the token immediately.
+</Accordion>
+
+## Step 2: Initialize Your Repository
+
+Navigate to your git repository and run:
+
+```bash
+cd your-project
+buildstory init
+```
+
+The CLI will:
+1. Check for a git repository
+2. Detect your project name from `package.json` (or use the directory name)
+3. Prompt you to confirm or customize the project name
+4. Collect project context (file tree, recent commits, README)
+5. Create the project on the server
+6. Install the git post-commit hook
+7. Create `.buildstoryignore` with default patterns
+
+<CodeGroup>
+
+```bash Terminal Output
+Project name (your-project): 
+Collecting project context...
+Creating project "your-project" on server...
+Created .buildstoryignore with default patterns
+Installed post-commit hook
+
+Buildstory initialized for "your-project"
+  Project ID: proj_a1b2c3d4e5f6
+  Machine ID: macbook-pro-4a2c1f
+  Endpoint:   https://buildstory-cli.vercel.app
+
+Make a commit to start capturing your build story!
+```
+
+</CodeGroup>
+
+<Note>
+The `.buildstory/` directory is automatically added to your `.gitignore` to keep your repository clean.
+</Note>
+
+## Step 3: Make a Commit
+
+Make a change to your project and commit it as you normally would:
+
+```bash
+# Make some changes
+echo "# My Project" > README.md
+
+# Commit normally
+git add README.md
+git commit -m "add initial readme"
+```
+
+The post-commit hook runs silently in the background:
+
+<CodeGroup>
+
+```bash Hook Activity (.buildstory/hook.log)
+2026-03-03T15:42:18Z [OK] a7f3c2d entry=e_4f8a9c2b1d6e3a5f http=200
+```
+
+</CodeGroup>
+
+<Note>
+The hook runs entirely in the background and won't slow down your commits. It typically completes in under 1 second.
+</Note>
+
+## Step 4: View the Enriched Update
+
+Visit the Buildstory dashboard to see your AI-enriched update:
+
+1. Go to [https://buildstory-cli.vercel.app/dashboard](https://buildstory-cli.vercel.app/dashboard)
+2. Click on your project
+3. Review the enriched update in the "Drafts to Review" section
+
+The AI will have transformed your commit into something like:
+
+<CardGroup cols={1}>
+  <Card title="Add initial project documentation" icon="file-text">
+    Created README.md with project overview and setup instructions. Establishes baseline documentation for new contributors.
+    
+    **Type:** feature  
+    **Tags:** docs, setup, readme
+  </Card>
+</CardGroup>
+
+## Step 5: Approve and Publish
+
+From the dashboard, you can:
+
+- **Edit** the title or description if needed
+- **Approve** to publish the update to your timeline
+- **Dismiss** if you don't want to publish it
+
+<Steps>
+  <Step title="Review the enriched update">
+    The AI analyzes file changes and generates a human-readable description. Review it for accuracy.
+  </Step>
+  
+  <Step title="Edit if needed">
+    Click **Edit** to refine the title or description before approving.
+  </Step>
+  
+  <Step title="Approve to publish">
+    Click **Approve** to add the update to your public timeline.
+  </Step>
+</Steps>
+
+## Verify Everything Works
+
+Run the `status` command to check your setup:
+
+```bash
+buildstory status
+```
+
+<CodeGroup>
+
+```bash Terminal Output
+--- Credentials ---
+  Token: bsk_4a2c... (saved)
+
+--- Project Config ---
+  Project ID: proj_a1b2c3d4e5f6
+  Endpoint:   https://buildstory-cli.vercel.app
+  Machine ID: macbook-pro-4a2c1f
+
+--- Git Hook ---
+  Post-commit hook: INSTALLED
+
+--- Connectivity ---
+  Server: REACHABLE (v0.2.0)
+  Auth:   VALID
+  DB:     CONNECTED
+
+--- Project ---
+  Name: your-project
+  Commits received:     1
+  Enriched:             1
+  Awaiting enrichment:  0
+  Approved updates:     0
+  Pending drafts:       1
+  Last commit received: 5s ago (a7f3c2d)
+
+--- Hook Activity ---
+  Summary: 1 OK, 0 FAIL, 0 SKIP
+  Last 5 entries:
+    2026-03-03T15:42:18Z [OK] a7f3c2d entry=e_4f8a9c2b1d6e3a5f http=200
+
+--- Commit Delivery ---
+  [+] a7f3c2d DELIVERED
+  All recent commits delivered
+
+All checks passed.
+```
+
+</CodeGroup>
+
+<Note>
+If any check fails, the `status` command will highlight the issue and suggest next steps.
+</Note>
+
+## What Happens Next
+
+From this point forward, every commit you make will:
+
+1. **Automatically capture** commit data via the post-commit hook
+2. **Enrich in real-time** using Claude (typically within 2-3 seconds)
+3. **Appear as a draft** in your dashboard for review
+4. **Publish to timeline** once you approve it
+
+<Check>
+You're all set! Continue committing as usual, and Buildstory will capture your build story automatically.
+</Check>
+
+## Common Workflows
+
+<AccordionGroup>
+  <Accordion title="Exclude files from commit data">
+    Edit `.buildstoryignore` to add glob patterns for files you want to exclude:
+
+    ```bash .buildstoryignore
+    # Lock files
+    package-lock.json
+    bun.lock
+    
+    # Environment files
+    .env
+    .env.*
+    
+    # Build output
+    dist/
+    build/
+    .next/
+    ```
+  </Accordion>
+
+  <Accordion title="Bulk approve multiple drafts">
+    In the dashboard, select multiple draft updates and click **Approve All** to publish them at once.
+  </Accordion>
+
+  <Accordion title="Manually trigger enrichment">
+    If enrichment is delayed, click the **Enrich Now** button in the dashboard to process pending commits immediately.
+  </Accordion>
+
+  <Accordion title="Check commit delivery">
+    Use `buildstory status` to verify that recent commits were successfully delivered to the server. The **Commit Delivery** section shows the status of your last 5 commits.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Hook not running">
+    Check that the post-commit hook exists and is executable:
+
+    ```bash
+    ls -la .git/hooks/post-commit
+    cat .git/hooks/post-commit
+    ```
+
+    If missing, run `buildstory init` again.
+  </Accordion>
+
+  <Accordion title="Commits not appearing in dashboard">
+    Check the hook log for errors:
+
+    ```bash
+    cat .buildstory/hook.log
+    ```
+
+    Look for `[FAIL]` or `[SKIP]` entries. Common issues:
+    - Missing credentials: Run `buildstory auth`
+    - Missing config: Run `buildstory init`
+    - Network timeout: Check your internet connection
+  </Accordion>
+
+  <Accordion title="Enrichment taking too long">
+    Enrichment typically completes within 2-3 seconds. If commits are stuck:
+
+    1. Wait 2 minutes (the system auto-retries)
+    2. Or click **Enrich Now** in the dashboard to trigger manual enrichment
+
+    A background cron job also sweeps for unenriched entries every 15 minutes.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="CLI Reference"
+    icon="terminal"
+    href="/cli/overview"
+  >
+    Explore all available commands and options
+  </Card>
+  <Card
+    title="Dashboard Guide"
+    icon="browser"
+    href="/features/dashboard"
+  >
+    Learn how to manage and publish updates
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api/overview"
+  >
+    Integrate Buildstory with your own tools
+  </Card>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/guides/configuration"
+  >
+    Customize Buildstory for your workflow
+  </Card>
+</CardGroup>

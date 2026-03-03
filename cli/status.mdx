@@ -1,0 +1,258 @@
+---
+title: 'buildstory status'
+description: 'Check configuration and health diagnostics'
+icon: 'heart-pulse'
+---
+
+Check your Buildstory configuration, connectivity, and pipeline health. This command performs comprehensive diagnostics to ensure everything is working correctly.
+
+## Usage
+
+```bash
+buildstory status
+```
+
+## What It Checks
+
+1. **Credentials** - Verifies authentication token exists
+2. **Project Config** - Checks local `.buildstory/config.json`
+3. **Git Hook** - Confirms post-commit hook is installed
+4. **Connectivity** - Tests server connection and API health
+5. **Project Details** - Fetches pipeline statistics from server
+6. **Hook Activity** - Analyzes `.buildstory/hook.log` for errors
+7. **Commit Delivery** - Verifies recent commits reached the server
+
+## Example Output
+
+```bash
+--- Credentials ---
+  Token: bsk_1234... (saved)
+
+--- Project Config ---
+  Project ID: proj_abc123xyz
+  Endpoint:   https://buildstory-cli.vercel.app
+  Machine ID: macbook-pro-a1b2c3
+
+--- Git Hook ---
+  Post-commit hook: INSTALLED
+
+--- Connectivity ---
+  Server: REACHABLE (v1.2.0)
+  Auth:   VALID
+  DB:     CONNECTED
+
+--- Project ---
+  Name: my-app
+  Commits received:  42
+  Enriched:          38
+  Awaiting enrichment: 4
+  Approved updates:  15
+  Pending drafts:    3
+  Last commit received: 2m ago (a1b2c3d)
+
+--- Hook Activity ---
+  Summary: 38 OK, 2 FAIL, 1 SKIP
+  Recent failures:
+    2026-03-03 10:15:23 [FAIL] HTTP 401 (unauthorized)
+  Last 5 entries:
+    2026-03-03 10:30:45 [OK] HTTP 200
+    2026-03-03 10:25:12 [OK] HTTP 200
+    2026-03-03 10:20:33 [OK] HTTP 200
+    2026-03-03 10:15:23 [FAIL] HTTP 401
+    2026-03-03 10:10:01 [OK] HTTP 200
+
+--- Commit Delivery ---
+  [+] a1b2c3d DELIVERED
+  [+] b2c3d4e DELIVERED
+  [+] c3d4e5f DELIVERED
+  [-] d4e5f6g MISSING
+  [-] e5f6g7h MISSING
+  2 of 5 recent commits not yet received by server
+
+Some checks failed. Review the output above.
+```
+
+## Exit Codes
+
+- **0** - All checks passed
+- **1** - One or more checks failed
+
+## Diagnostic Sections
+
+### Credentials
+
+Checks for authentication token at `~/.buildstory/credentials.json`.
+
+**Success:**
+```
+Token: bsk_1234... (saved)
+```
+
+**Failure:**
+```
+Token: NOT FOUND
+Run "buildstory auth" to save your API key.
+```
+
+### Project Config
+
+Verifies `.buildstory/config.json` exists and is valid JSON.
+
+**Success:**
+```
+Project ID: proj_abc123xyz
+Endpoint:   https://buildstory-cli.vercel.app
+Machine ID: macbook-pro-a1b2c3
+```
+
+**Failure:**
+```
+Config: NOT FOUND
+Run "buildstory init" in a git repository.
+```
+
+**Invalid JSON:**
+```
+Config file exists but is invalid JSON
+```
+
+### Git Hook
+
+Checks if `.git/hooks/post-commit` exists and contains Buildstory integration.
+
+**Success:**
+```
+Post-commit hook: INSTALLED
+```
+
+**Missing:**
+```
+Post-commit hook: NOT INSTALLED
+```
+
+**Exists but no Buildstory:**
+```
+Post-commit hook: EXISTS but missing Buildstory integration
+```
+
+### Connectivity
+
+Tests connection to `/api/v1/health` endpoint (10-second timeout).
+
+**Success:**
+```
+Server: REACHABLE (v1.2.0)
+Auth:   VALID
+DB:     CONNECTED
+```
+
+**Unreachable:**
+```
+Server: UNREACHABLE (Failed to fetch)
+```
+
+**Invalid Auth:**
+```
+Auth:   INVALID
+```
+
+### Project Details
+
+Fetches statistics from `/api/v1/projects/[id]` endpoint.
+
+**Metrics shown:**
+- **Commits received** - Total raw entries captured
+- **Enriched** - Commits processed by AI
+- **Awaiting enrichment** - Commits pending AI processing
+- **Approved updates** - Timeline entries published
+- **Pending drafts** - Updates awaiting review
+- **Last commit received** - Relative time and hash of most recent commit
+
+**Failure:**
+```
+Project lookup failed: 404
+```
+
+### Hook Activity
+
+Parses `.buildstory/hook.log` for structured analysis.
+
+**Summary counts:**
+- **OK** - Successful hook executions
+- **FAIL** - Failed hook executions (HTTP errors)
+- **SKIP** - Skipped executions (missing config/credentials)
+
+**Shows:**
+- Last 3 failure entries
+- Last 5 log entries overall
+
+**No log file:**
+```
+No hook.log found (no commits yet, or hook logging not enabled)
+```
+
+### Commit Delivery
+
+Compares last 5 local commits against server via `/api/v1/projects/[id]/entries/check`.
+
+**Format:**
+```
+[+] a1b2c3d DELIVERED   (commit exists on server)
+[-] d4e5f6g MISSING     (commit not yet received)
+```
+
+**Summary:**
+```
+2 of 5 recent commits not yet received by server
+```
+
+or
+
+```
+All recent commits delivered
+```
+
+**No commits:**
+```
+No local commits found
+```
+
+## Troubleshooting
+
+### High SKIP count in Hook Activity
+
+Most common cause: Missing `.buildstory/config.json` or credentials. The hook skips execution when configuration is incomplete.
+
+**Solution:** Ensure you've run `buildstory init` and `buildstory auth`.
+
+### MISSING commits in Delivery Check
+
+Commits may take a few seconds to appear on the server, especially if the hook is running in the background.
+
+**Solution:** Wait a few seconds and run `buildstory status` again.
+
+### FAIL entries in Hook Activity
+
+Check the failure messages for HTTP status codes:
+- **401** - Invalid or expired authentication token
+- **403** - Permission denied (not project owner)
+- **500** - Server error
+
+**Solution:** For 401 errors, re-authenticate with `buildstory auth`.
+
+### Auth: INVALID
+
+Your API key may have been revoked or expired.
+
+**Solution:** Re-authenticate with `buildstory auth`.
+
+## Performance Notes
+
+- Connectivity checks have a 10-second timeout
+- Git log command has a 5-second timeout
+- Only last 5 commits are checked for delivery status
+
+## Related Commands
+
+- [`buildstory auth`](/cli/auth) - Re-authenticate if token is invalid
+- [`buildstory init`](/cli/init) - Reinitialize if config is missing

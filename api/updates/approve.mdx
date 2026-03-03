@@ -1,0 +1,67 @@
+---
+title: "Approve Draft Update"
+api: "POST /api/v1/updates/{entryId}/approve"
+description: "Approve a single draft update to make it publicly visible"
+---
+
+## Authentication
+
+Requires Supabase session authentication (cookie-based). User must own the project this update belongs to.
+
+## Path Parameters
+
+<ParamField path="entryId" type="string" required>
+  Entry ID of the draft to approve (format: `e_*`)
+</ParamField>
+
+## Request Body
+
+No request body required.
+
+## Response
+
+<ResponseField name="status" type="string">
+  Returns "ok" on success
+</ResponseField>
+
+<RequestExample>
+```bash
+curl -X POST https://buildstory-cli.vercel.app/api/v1/updates/e_xyz789/approve \
+  -H "Cookie: your-session-cookie"
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "status": "ok"
+}
+```
+</ResponseExample>
+
+## Behavior
+
+- Sets the update status to `"approved"`
+- Records the approval timestamp in `approved_at`
+- Updates the `updated_at` timestamp
+- Makes the update visible on the public timeline
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+| Status Code | Error Message | Description |
+|-------------|---------------|-------------|
+| 401 | "Unauthorized" | No valid session |
+| 404 | "Draft not found or already processed" | Entry doesn't exist or is no longer in draft status |
+| 500 | "Internal server error" | Database or server error |
+
+## Notes
+
+Once approved, an update:
+- Cannot be edited or dismissed
+- Appears in the public timeline endpoint
+- Is grouped by day based on the original commit timestamp
+- Can be filtered by type on the timeline UI

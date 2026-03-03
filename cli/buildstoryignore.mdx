@@ -1,0 +1,265 @@
+---
+title: .buildstoryignore
+description: Exclude files from commit data using glob patterns
+---
+
+## Overview
+
+The `.buildstoryignore` file allows you to exclude specific files from the commit data sent to Buildstory. This is useful for omitting generated files, large binaries, or any files that don't contribute meaningful context to your build story.
+
+## Location
+
+```
+.buildstoryignore
+```
+
+The file is created in your repository root during `buildstory init`.
+
+## File Format
+
+The file uses glob patterns, one per line:
+
+```
+# Comment lines start with #
+
+# Exact filenames
+package-lock.json
+
+# Wildcards
+*.min.js
+*.map
+
+# Directories (with trailing slash)
+dist/
+build/
+.next/
+
+# File extensions
+*.png
+*.jpg
+```
+
+## Pattern Matching
+
+<ParamField path="Exact match" type="pattern">
+  Match files by exact name.
+  
+  **Example:**
+  ```
+  package-lock.json
+  ```
+  Excludes any file named `package-lock.json` in any directory.
+</ParamField>
+
+<ParamField path="Wildcard" type="pattern">
+  Use `*` to match any characters.
+  
+  **Example:**
+  ```
+  *.min.js
+  ```
+  Excludes all files ending with `.min.js`.
+</ParamField>
+
+<ParamField path="Directory" type="pattern">
+  Match all files within a directory by using a trailing slash.
+  
+  **Example:**
+  ```
+  dist/
+  ```
+  Excludes all files in the `dist/` directory.
+</ParamField>
+
+<ParamField path="Comments" type="pattern">
+  Lines starting with `#` are treated as comments.
+  
+  **Example:**
+  ```
+  # Generated files
+  dist/
+  ```
+</ParamField>
+
+<ParamField path="Blank lines" type="pattern">
+  Empty lines are ignored.
+</ParamField>
+
+## Default Patterns
+
+When you run `buildstory init`, the file is created with these default patterns:
+
+```
+# Buildstory ignore patterns
+# Files matching these patterns will be excluded from commit data
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+bun.lock
+yarn.lock
+Gemfile.lock
+Cargo.lock
+composer.lock
+poetry.lock
+
+# Generated files
+*.min.js
+*.min.css
+*.map
+dist/
+build/
+.next/
+
+# Binary and media files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.mp4
+*.mp3
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+```
+
+## How It Works
+
+The post-commit hook processes `.buildstoryignore` when building the commit payload:
+
+1. For each file changed in the commit, the hook checks it against patterns in `.buildstoryignore`
+2. If a file matches any pattern, it's excluded from the `files` array in the payload
+3. Excluded files don't contribute to file stats, diff summaries, or AI enrichment context
+4. The overall commit is still recorded, but excluded files are simply omitted
+
+## Customization
+
+You can edit `.buildstoryignore` at any time to add or remove patterns. Changes take effect immediately for subsequent commits.
+
+### Adding Patterns
+
+Add new patterns to exclude additional files:
+
+```
+# Custom patterns
+*.test.js
+vendor/
+```
+
+### Removing Patterns
+
+Comment out or delete patterns to include files that were previously excluded:
+
+```
+# *.svg  (now included)
+```
+
+## Use Cases
+
+### Exclude Test Fixtures
+
+```
+# Test data
+fixtures/
+*.fixture.json
+__snapshots__/
+```
+
+### Exclude Generated Code
+
+```
+# Auto-generated
+schema.generated.ts
+api-types.d.ts
+```
+
+### Exclude Documentation Builds
+
+```
+# Docs
+docs/dist/
+*.html
+```
+
+### Exclude Environment Files
+
+```
+# Environment
+.env
+.env.local
+.env.production
+```
+
+## Differences from .gitignore
+
+<Note>
+  `.buildstoryignore` is **not** the same as `.gitignore`. They serve different purposes:
+  
+  - `.gitignore`: Controls which files Git tracks (completely omits them from version control)
+  - `.buildstoryignore`: Controls which **tracked** files are sent to Buildstory (files remain in Git)
+  
+  A file can be tracked by Git but excluded from Buildstory data by listing it in `.buildstoryignore`.
+</Note>
+
+## Pattern Limitations
+
+The `.buildstoryignore` implementation uses shell glob patterns, not full gitignore syntax:
+
+- **Supported**: Simple wildcards (`*`), exact names, directory matching
+- **Not supported**: Character ranges (`[a-z]`), negation (`!pattern`), recursive glob (`**`)
+
+For most use cases, simple wildcards and directory patterns are sufficient.
+
+## Verification
+
+To verify which files are being sent to Buildstory:
+
+1. Make a test commit
+2. Check `.buildstory/hook.log` for the entry ID
+3. View the commit in your Buildstory dashboard
+4. Examine which files appear in the enriched update
+
+Alternatively, if you have admin access, use the debug view:
+
+```
+https://buildstory.ai/dashboard/proj_yourprojectid/debug
+```
+
+This shows the raw payload including the `files` array with all included files.
+
+## Troubleshooting
+
+### Pattern Not Working
+
+If a pattern doesn't seem to exclude files:
+
+1. Check for typos in the pattern
+2. Ensure there are no leading/trailing spaces
+3. Verify the pattern uses shell glob syntax (not regex)
+4. Test the pattern with a simple commit and check the dashboard
+
+### File Still Appears
+
+If a file still appears after adding it to `.buildstoryignore`:
+
+1. Verify the pattern matches the file path
+2. Check that `.buildstoryignore` exists in the repository root
+3. Make a new commit after updating `.buildstoryignore` (changes aren't retroactive)
+4. Examine the full file path shown in `git diff-tree --name-status -r HEAD`
+
+### All Files Excluded
+
+If no files appear in Buildstory:
+
+1. Check if you have overly broad patterns (like `*`)
+2. Review the default patterns to ensure they're not too aggressive for your project
+3. Comment out sections of `.buildstoryignore` to identify the problematic pattern

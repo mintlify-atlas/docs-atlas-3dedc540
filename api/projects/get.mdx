@@ -1,0 +1,150 @@
+---
+title: "Get Project"
+api: "GET /api/v1/projects/{id}"
+description: "Retrieve project details and pipeline statistics"
+---
+
+## Authentication
+
+Accepts either:
+- Bearer token via `Authorization: Bearer <token>` header
+- Supabase session cookie (for dashboard requests)
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID (e.g., `proj_1a2b3c4d5e6f7890`)
+</ParamField>
+
+## Response
+
+Returns project record with additional `stats` object.
+
+<ResponseField name="id" type="string">
+  Project ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Project name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Project description
+</ResponseField>
+
+<ResponseField name="owner_id" type="string">
+  User ID of project owner
+</ResponseField>
+
+<ResponseField name="context" type="object | null">
+  Repository context data (if provided during creation)
+</ResponseField>
+
+<ResponseField name="overview" type="string | null">
+  AI-generated project overview (1-3 sentences)
+</ResponseField>
+
+<ResponseField name="overview_generated_at" type="string | null">
+  Timestamp of last overview generation
+</ResponseField>
+
+<ResponseField name="overview_context_hash" type="string | null">
+  Hash of context used for overview generation
+</ResponseField>
+
+<ResponseField name="overview_edited" type="boolean">
+  Whether owner has manually edited the overview
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Project creation timestamp
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Pipeline statistics object
+  
+  <Expandable title="Stats properties">
+    <ResponseField name="total_updates" type="number">
+      Count of approved enriched updates
+    </ResponseField>
+    
+    <ResponseField name="pending_drafts" type="number">
+      Count of draft updates awaiting review
+    </ResponseField>
+    
+    <ResponseField name="total_entries" type="number">
+      Total raw commit entries received
+    </ResponseField>
+    
+    <ResponseField name="enriched_entries" type="number">
+      Number of entries that have been AI-enriched
+    </ResponseField>
+    
+    <ResponseField name="unenriched_entries" type="number">
+      Number of entries still awaiting enrichment (calculated as `total_entries - enriched_entries`)
+    </ResponseField>
+    
+    <ResponseField name="last_received_at" type="string | null">
+      Timestamp of most recently received commit
+    </ResponseField>
+    
+    <ResponseField name="last_commit_hash" type="string | null">
+      Git hash of most recently received commit
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl https://buildstory-cli.vercel.app/api/v1/projects/proj_1a2b3c4d5e6f7890 \
+  -H "Authorization: Bearer bsk_1234567890abcdef"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 Success
+{
+  "id": "proj_1a2b3c4d5e6f7890",
+  "name": "My Project",
+  "description": "A cool web application",
+  "owner_id": "user-uuid-here",
+  "context": {
+    "total_commits": 42,
+    "file_tree": ["src/index.ts", "package.json"]
+  },
+  "overview": "A modern web application built with TypeScript and React.",
+  "overview_generated_at": "2026-03-03T10:30:00Z",
+  "overview_context_hash": "abc123def456",
+  "overview_edited": false,
+  "created_at": "2026-03-01T12:00:00Z",
+  "stats": {
+    "total_updates": 15,
+    "pending_drafts": 3,
+    "total_entries": 42,
+    "enriched_entries": 40,
+    "unenriched_entries": 2,
+    "last_received_at": "2026-03-03T09:45:00Z",
+    "last_commit_hash": "a1b2c3d4e5f6g7h8i9j0"
+  }
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": "Unauthorized"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "Project not found"
+}
+```
+</ResponseExample>
+
+## Ownership Verification
+
+- Authenticated user must be the project owner
+- Returns 404 (not 403) if project exists but user is not the owner
+- Legacy API tokens (without user association) skip ownership check
+- Used by CLI `buildstory status` command to verify project health

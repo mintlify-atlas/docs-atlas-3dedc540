@@ -1,0 +1,517 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for the Buildstory CLI and commit capture pipeline
+---
+
+This guide covers common issues you might encounter when using Buildstory and how to resolve them.
+
+## Using buildstory status
+
+The `buildstory status` command is your first line of defense for diagnosing issues. It performs comprehensive checks across your entire setup:
+
+```bash
+buildstory status
+```
+
+This command checks:
+- **Credentials** - Whether you have a valid API token saved
+- **Project config** - Project ID, endpoint, machine ID
+- **Git hook** - Whether the post-commit hook is installed
+- **Connectivity** - Server reachability, auth validity, database connection
+- **Project stats** - Commits received, enriched, approved, pending drafts
+- **Hook activity** - OK/FAIL/SKIP counts from `.buildstory/hook.log`
+- **Commit delivery** - Whether your last 5 commits reached the server
+
+<Note>
+Run `buildstory status` whenever you suspect something isn't working. The output will pinpoint exactly which part of the pipeline has an issue.
+</Note>
+
+## Hook not running
+
+### Symptom
+
+You make commits, but they never appear on the dashboard. `buildstory status` shows:
+
+```
+--- Hook Activity ---
+  No hook.log found (no commits yet, or hook logging not enabled)
+```
+
+Or hook.log shows only `[SKIP]` entries.
+
+### Diagnosis
+
+<Steps>
+  <Step title="Check if hook is installed">
+    ```bash
+    cat .git/hooks/post-commit
+    ```
+    
+    You should see a script that includes "buildstory" or "BUILDSTORY" in the content.
+    
+    If the file doesn't exist or doesn't contain Buildstory code:
+    ```bash
+    buildstory init
+    ```
+  </Step>
+  
+  <Step title="Check hook permissions">
+    ```bash
+    ls -la .git/hooks/post-commit
+    ```
+    
+    Should show executable permissions: `-rwxr-xr-x`
+    
+    If not executable:
+    ```bash
+    chmod +x .git/hooks/post-commit
+    ```
+  </Step>
+  
+  <Step title="Check for config files">
+    Verify both config files exist:
+    ```bash
+    cat ~/.buildstory/credentials.json
+    cat .buildstory/config.json
+    ```
+    
+    If credentials are missing:
+    ```bash
+    buildstory auth
+    ```
+    
+    If project config is missing:
+    ```bash
+    buildstory init
+    ```
+  </Step>
+  
+  <Step title="Test the hook manually">
+    Make a test commit and check the hook log:
+    ```bash
+    git commit --allow-empty -m "test buildstory hook"
+    cat .buildstory/hook.log
+    ```
+    
+    You should see a new entry with `[OK]` or `[FAIL]` status.
+  </Step>
+</Steps>
+
+### Common causes
+
+| Issue | Symptom in hook.log | Solution |
+|-------|---------------------|----------|
+| Missing credentials | `[SKIP] creds_missing` | Run `buildstory auth` |
+| Missing project config | `[SKIP] config_missing` | Run `buildstory init` |
+| Empty config values | `[SKIP] empty_config` | Delete `.buildstory/config.json` and run `buildstory init` again |
+| Hook not executable | No entries in log | Run `chmod +x .git/hooks/post-commit` |
+
+<Warning>
+If you see `[SKIP]` entries in hook.log, the hook is running but can't find required configuration. Check the log message for details on which file is missing.
+</Warning>
+
+## Commits not appearing on dashboard
+
+### Symptom
+
+Hook.log shows `[OK]` entries, but commits don't appear on the dashboard. `buildstory status` shows:
+
+```
+--- Commit Delivery ---
+  [-] abc1234 MISSING
+  [-] def5678 MISSING
+```
+
+### Diagnosis
+
+<Steps>
+  <Step title="Check authentication">
+    ```bash
+    buildstory status
+    ```
+    
+    Look for:
+    ```
+    --- Connectivity ---
+      Server: REACHABLE (v0.2.0)
+      Auth:   VALID
+      DB:     CONNECTED
+    ```
+    
+    If `Auth: INVALID`:
+    ```bash
+    buildstory auth
+    ```
+  </Step>
+  
+  <Step title="Check project ownership">
+    The API key must belong to the user who owns the project. If you're using a different account than when you ran `buildstory init`, commits will be rejected with 403 Forbidden.
+    
+    Solution: Reinitialize with the correct account:
+    ```bash
+    buildstory auth  # Authenticate with the correct account
+    rm -rf .buildstory/
+    buildstory init
+    ```
+  </Step>
+  
+  <Step title="Check hook.log for errors">
+    ```bash
+    tail -20 .buildstory/hook.log
+    ```
+    
+    Look for `[FAIL]` entries with HTTP status codes:
+    
+    - `http=401` - Invalid or expired API token
+    - `http=403` - Project ownership mismatch
+    - `http=404` - Project doesn't exist on server
+    - `http=500` - Server error
+    - `http=000` - Network timeout or connectivity issue
+  </Step>
+  
+  <Step title="Check server connectivity">
+    Test the endpoint manually:
+    ```bash
+    curl -H "Authorization: Bearer $(cat ~/.buildstory/credentials.json | grep token | cut -d'"' -f4)" \
+      https://buildstory-cli.vercel.app/api/v1/health
+    ```
+    
+    Should return:
+    ```json
+    {
+      "status": "ok",
+      "version": "0.2.0",
+      "auth": "valid",
+      "database": "connected"
+    }
+    ```
+  </Step>
+</Steps>
+
+### Common HTTP errors
+
+<Accordion title="401 Unauthorized">
+  **Cause**: Invalid, expired, or revoked API token.
+  
+  **Solution**:
+  ```bash
+  buildstory auth
+  ```
+  
+  Then make a new commit to test:
+  ```bash
+  git commit --allow-empty -m "test after reauth"
+  buildstory status
+  ```
+</Accordion>
+
+<Accordion title="403 Forbidden">
+  **Cause**: Your API token belongs to a different user than the project owner.
+  
+  **Solution**:
+  1. Check who owns the project (visit the dashboard and see which account you're signed in as)
+  2. Re-authenticate with the correct account:
+     ```bash
+     buildstory auth
+     ```
+  3. Verify auth matches project owner:
+     ```bash
+     buildstory status
+     ```
+  
+  If the ownership mismatch can't be resolved, reinitialize as a new project:
+  ```bash
+  rm -rf .buildstory/
+  buildstory init
+  ```
+</Accordion>
+
+<Accordion title="404 Not Found">
+  **Cause**: Project doesn't exist on the server (possibly deleted, or config.json references wrong project ID).
+  
+  **Solution**:
+  ```bash
+  rm -rf .buildstory/
+  buildstory init
+  ```
+</Accordion>
+
+<Accordion title="500 Internal Server Error">
+  **Cause**: Server-side issue (database down, AI service timeout, etc.).
+  
+  **Solution**:
+  1. Check the status page or GitHub issues for known outages
+  2. Wait a few minutes and try again
+  3. If persistent, contact support with the entry_id from hook.log
+</Accordion>
+
+<Accordion title="000 Connection failed">
+  **Cause**: Network timeout, DNS failure, or server unreachable.
+  
+  **Solution**:
+  1. Check your internet connection
+  2. Verify the endpoint in `.buildstory/config.json` is correct
+  3. Test server reachability:
+     ```bash
+     curl https://buildstory-cli.vercel.app/api/v1/health
+     ```
+  4. If you're behind a corporate firewall, check if the endpoint is blocked
+</Accordion>
+
+## Authentication issues
+
+### Browser auth not working
+
+**Symptom**: `buildstory auth` opens the browser, but clicking "Authorize" does nothing or shows an error.
+
+**Solutions**:
+
+<Steps>
+  <Step title="Check if you're signed in">
+    Make sure you're signed in to your Buildstory account in the browser. If not, sign in first, then try `buildstory auth` again.
+  </Step>
+  
+  <Step title="Try a different browser">
+    ```bash
+    # Copy the auth URL from the CLI output and paste it in a different browser
+    buildstory auth
+    ```
+  </Step>
+  
+  <Step title="Use token-based auth instead">
+    Generate an API key from the dashboard and use it directly:
+    ```bash
+    buildstory auth --token bsk_your_api_key_here
+    ```
+  </Step>
+  
+  <Step title="Check session expiry">
+    CLI auth sessions expire after 5 minutes. If you wait too long, run `buildstory auth` again to create a fresh session.
+  </Step>
+</Steps>
+
+### Token revoked or expired
+
+**Symptom**: `buildstory status` shows `Auth: INVALID`, or hook.log shows `http=401`.
+
+**Solution**:
+
+```bash
+buildstory auth
+```
+
+Your old token may have been revoked (e.g., if you generated a new key from the dashboard, which revokes existing keys by default).
+
+<Note>
+Each time you run `buildstory auth` via browser flow, it generates a new API key without revoking existing ones. But generating a key from the dashboard revokes all your existing keys for security.
+</Note>
+
+## Commits awaiting enrichment
+
+### Symptom
+
+Dashboard shows "X commits awaiting enrichment" for several minutes. `buildstory status` shows:
+
+```
+--- Project ---
+  Commits received:     50
+  Enriched:             45
+  Awaiting enrichment:  5
+```
+
+### Diagnosis
+
+<Steps>
+  <Step title="Wait for automatic enrichment">
+    Enrichment normally completes within seconds, but can take longer during high load. Wait 1-2 minutes.
+  </Step>
+  
+  <Step title="Check for retry limit">
+    If entries fail enrichment 3 times, they're skipped by the automatic sweep job. Check the dashboard debug page (admin only) for entries with `retry_count >= 3`.
+  </Step>
+  
+  <Step title="Manually trigger enrichment">
+    From the project dashboard, click the **"Enrich Now"** button. This processes up to 10 unenriched entries immediately, bypassing retry limits.
+  </Step>
+  
+  <Step title="Check server status">
+    If manual enrichment also fails, there may be a server-side issue (AI service down, database timeout, etc.). Check the status page or contact support.
+  </Step>
+</Steps>
+
+### Common causes
+
+- **AI service timeout**: Claude API may be experiencing high load
+- **Malformed commit data**: Edge case in diff parsing (rare)
+- **Rate limiting**: Too many enrichment requests in a short time
+- **Database deadlock**: Transient database issue during enrichment
+
+<Note>
+The cron sweep job runs every 15 minutes and processes up to 10 unenriched entries per run. If you have a large backlog, it may take multiple cron cycles to catch up.
+</Note>
+
+## Hook.log shows failures
+
+### Symptom
+
+```bash
+cat .buildstory/hook.log
+```
+
+Shows repeated `[FAIL]` entries:
+
+```
+2024-03-15T10:35:42Z [FAIL] abc1234 entry=e_def567890 http=401 body=Unauthorized
+2024-03-15T10:40:15Z [FAIL] def5678 entry=e_ghi123456 http=403 body=Forbidden
+```
+
+### Diagnosis
+
+Check the `http=` status code in the failure line:
+
+- **401**: Re-authenticate with `buildstory auth`
+- **403**: Project ownership mismatch - see "403 Forbidden" section above
+- **404**: Project doesn't exist - run `buildstory init` again
+- **500**: Server error - wait and retry, or contact support
+- **000**: Network issue - check connectivity
+
+Also check the `body=` field for additional error details (truncated to 200 chars).
+
+## Commits not filtered by .buildstoryignore
+
+### Symptom
+
+Files you added to `.buildstoryignore` still appear in commit payloads on the dashboard.
+
+### Diagnosis
+
+<Steps>
+  <Step title="Check pattern syntax">
+    `.buildstoryignore` uses shell glob patterns, not regex. Make sure your patterns are valid:
+    
+    ```text
+    # Correct
+    *.log
+    dist/
+    .env.*
+    
+    # Incorrect (regex syntax doesn't work)
+    .*\.log$
+    dist/.*
+    ```
+  </Step>
+  
+  <Step title="Test pattern matching">
+    The post-commit hook uses shell `case` matching. Test your patterns:
+    ```bash
+    # Test if a file matches a pattern
+    case "src/output.log" in
+      *.log) echo "MATCH" ;;
+      *) echo "NO MATCH" ;;
+    esac
+    ```
+  </Step>
+  
+  <Step title="Make a new commit">
+    Changes to `.buildstoryignore` only affect future commits, not existing ones:
+    ```bash
+    git add .buildstoryignore
+    git commit -m "update ignore patterns"
+    
+    # Next commit will use new patterns
+    git commit --allow-empty -m "test ignore patterns"
+    ```
+  </Step>
+  
+  <Step title="Check for comments">
+    Make sure patterns aren't commented out:
+    ```text
+    # This is a comment - ignored
+    *.log  # This pattern is active
+    # *.log  # This pattern is commented out and won't work
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+`.buildstoryignore` filtering happens in the post-commit hook before sending data to the server. If files still appear in the payload, the pattern didn't match during hook execution.
+</Warning>
+
+## Server connectivity issues
+
+### Symptom
+
+`buildstory status` shows:
+
+```
+--- Connectivity ---
+  Server: UNREACHABLE (fetch failed)
+```
+
+Or hook.log shows `http=000`.
+
+### Diagnosis
+
+<Steps>
+  <Step title="Check internet connection">
+    ```bash
+    ping buildstory-cli.vercel.app
+    ```
+  </Step>
+  
+  <Step title="Test endpoint manually">
+    ```bash
+    curl https://buildstory-cli.vercel.app/api/v1/health
+    ```
+    
+    Should return JSON with `{"status": "ok"}`.
+  </Step>
+  
+  <Step title="Check firewall/proxy">
+    If you're on a corporate network, the endpoint may be blocked. Try:
+    ```bash
+    curl -v https://buildstory-cli.vercel.app/api/v1/health
+    ```
+    
+    Look for connection refused, SSL errors, or proxy authentication prompts.
+  </Step>
+  
+  <Step title="Verify endpoint in config">
+    ```bash
+    cat .buildstory/config.json
+    ```
+    
+    Make sure `endpoint` is correct (should be `https://buildstory-cli.vercel.app` for the hosted version).
+  </Step>
+</Steps>
+
+### Corporate network workarounds
+
+If you're behind a firewall that blocks the Buildstory endpoint:
+
+1. Request your IT team to whitelist `buildstory-cli.vercel.app`
+2. Use a VPN to bypass the firewall
+3. Self-host Buildstory on an internal server and set a custom endpoint
+
+## Getting help
+
+If you're still stuck after trying these solutions:
+
+1. **Run `buildstory status`** and save the full output
+2. **Check hook.log** for recent failures: `tail -20 .buildstory/hook.log`
+3. **Gather diagnostic info**:
+   ```bash
+   buildstory --version
+   node --version
+   git --version
+   uname -a
+   ```
+4. **Open an issue** on [GitHub](https://github.com/coppinger/buildstory) with:
+   - Output from `buildstory status`
+   - Relevant entries from hook.log
+   - Steps to reproduce the issue
+   - Your environment (OS, Node version, shell)
+
+<Note>
+Never share your full credentials.json or API tokens in public issues. Redact the token value if you need to share config files.
+</Note>

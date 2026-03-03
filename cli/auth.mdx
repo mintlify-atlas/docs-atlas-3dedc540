@@ -1,0 +1,139 @@
+---
+title: 'buildstory auth'
+description: 'Authenticate with Buildstory'
+icon: 'key'
+---
+
+Authenticate the CLI with your Buildstory account. Supports both browser-based authentication and direct API key entry.
+
+## Usage
+
+```bash
+buildstory auth [options]
+```
+
+## Browser-Based Authentication (Default)
+
+The default authentication flow opens your browser for secure login:
+
+```bash
+buildstory auth
+```
+
+### Flow
+
+1. CLI creates an authentication session with the server
+2. Browser opens to the authorization page
+3. Sign in to your Buildstory account
+4. Authorize the CLI session
+5. CLI receives your API key and saves it locally
+
+### Example Output
+
+```bash
+Opening browser for authentication...
+
+If your browser didn't open, visit this URL:
+
+  https://buildstory-cli.vercel.app/cli/auth?session_id=abc123...
+
+⠋ Waiting for authorization... (3s)
+✓ Authenticated as user@example.com
+  API key saved to ~/.buildstory/credentials.json
+```
+
+## Direct Token Authentication
+
+For CI/CD environments or scripting, use the `--token` flag to authenticate with an API key directly:
+
+```bash
+buildstory auth --token <your-api-key>
+```
+
+### Example Output
+
+```bash
+API key saved to ~/.buildstory/credentials.json
+```
+
+## Options
+
+<ParamField path="--token" type="string">
+  Authenticate with an API key directly. Useful for CI/CD pipelines or automated scripts where browser-based auth is not available.
+  
+  **Example:**
+  ```bash
+  buildstory auth --token bsk_your_api_key_here
+  ```
+</ParamField>
+
+<ParamField path="-e, --endpoint" type="string" default="https://buildstory-cli.vercel.app">
+  Override the API endpoint URL. Can also be set via the `BUILDSTORY_ENDPOINT` environment variable.
+  
+  **Example:**
+  ```bash
+  buildstory auth --endpoint https://custom.buildstory.app
+  ```
+</ParamField>
+
+## Authentication Session Details
+
+### Browser Flow
+
+- **Session Duration:** 5 minutes
+- **Poll Interval:** 2 seconds
+- **Timeout:** 5 minutes (300 seconds)
+- **Session Status:** pending → approved → consumed
+
+### Session Expiry
+
+If you don't authorize within 5 minutes:
+
+```bash
+✗ Session expired. Please try again.
+```
+
+## Credentials Storage
+
+Authentication credentials are stored at:
+
+```
+~/.buildstory/credentials.json
+```
+
+This file contains:
+- `token` - Your API key (begins with `bsk_`)
+- `created_at` - Timestamp when the token was saved
+
+## Error Handling
+
+### Empty Token
+
+```bash
+buildstory auth --token ""
+```
+
+```
+Error: Token cannot be empty.
+```
+
+### Connection Errors
+
+```
+Error connecting to server: Failed to fetch
+```
+
+### Server Errors
+
+```
+Error creating auth session: 500 Internal server error
+```
+
+## Next Steps
+
+After authenticating, initialize Buildstory in your git repository:
+
+```bash
+cd your-project
+buildstory init
+```

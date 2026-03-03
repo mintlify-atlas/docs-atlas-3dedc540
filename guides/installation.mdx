@@ -1,0 +1,150 @@
+---
+title: Installation
+description: Install the Buildstory CLI and authenticate with your account
+---
+
+Buildstory is distributed as an npm package that provides a global CLI binary. The CLI installs a git post-commit hook that automatically captures commit metadata and sends it to the Buildstory server for AI enrichment.
+
+## Requirements
+
+- Node.js >= 18
+- Git repository
+- Buildstory account (sign up at [buildstory-cli.vercel.app](https://buildstory-cli.vercel.app))
+
+## Install the CLI
+
+Install Buildstory globally using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install -g buildstory
+```
+
+```bash yarn
+yarn global add buildstory
+```
+
+```bash pnpm
+pnpm add -g buildstory
+```
+
+```bash bun
+bun add -g buildstory
+```
+
+</CodeGroup>
+
+<Note>
+The CLI binary is called `buildstory` and will be available globally after installation.
+</Note>
+
+## Verify installation
+
+Confirm the CLI is installed correctly:
+
+```bash
+buildstory --version
+# Output: 0.2.0
+```
+
+View available commands:
+
+```bash
+buildstory --help
+```
+
+## Authenticate with your account
+
+Before initializing projects, you need to authenticate the CLI with your Buildstory account.
+
+### Browser-based authentication (recommended)
+
+The easiest way to authenticate is through your browser:
+
+<Steps>
+  <Step title="Run the auth command">
+    ```bash
+    buildstory auth
+    ```
+    
+    The CLI will automatically open your default browser to the authorization page.
+  </Step>
+  
+  <Step title="Approve the request">
+    Sign in to your Buildstory account (or create one if you don't have one yet) and click **Authorize** to approve the CLI.
+  </Step>
+  
+  <Step title="Confirmation">
+    Once approved, the CLI will display:
+    ```
+    ✓ Authenticated as your@email.com
+      API key saved to ~/.buildstory/credentials.json
+    ```
+  </Step>
+</Steps>
+
+<Note>
+If the browser doesn't open automatically, the CLI will display a URL you can copy and paste manually.
+</Note>
+
+### Token-based authentication (CI/scripting)
+
+For automated environments like CI pipelines or scripts, you can authenticate directly with an API key:
+
+```bash
+buildstory auth --token bsk_your_api_key_here
+```
+
+You can generate an API key from your dashboard at [buildstory-cli.vercel.app/dashboard](https://buildstory-cli.vercel.app/dashboard).
+
+<Warning>
+API keys are sensitive credentials. Never commit them to version control or expose them publicly.
+</Warning>
+
+## Custom endpoint (optional)
+
+By default, the CLI connects to `https://buildstory-cli.vercel.app`. If you're running a self-hosted instance, specify a custom endpoint:
+
+```bash
+buildstory auth --endpoint https://your-instance.example.com
+```
+
+You can also set the endpoint via environment variable:
+
+```bash
+export BUILDSTORY_ENDPOINT=https://your-instance.example.com
+buildstory auth
+```
+
+## What gets stored
+
+Authentication saves your API key to `~/.buildstory/credentials.json`:
+
+```json
+{
+  "token": "bsk_...",
+  "created_at": "2024-03-15T10:30:00.000Z"
+}
+```
+
+This file is used globally across all projects on your machine. The token is a per-user API key that authenticates all requests to the Buildstory server.
+
+## Multi-device support
+
+The browser-based authentication flow generates a new API key each time you run `buildstory auth`, but it doesn't revoke existing keys. This allows you to authenticate the CLI on multiple machines without breaking existing setups.
+
+<Note>
+If you need to revoke an API key for security reasons, you can do so from your dashboard. Revoking a key will cause the CLI to fail authentication on any machine using that key.
+</Note>
+
+## Next steps
+
+Once authenticated, you're ready to initialize Buildstory in your git repositories:
+
+```bash
+cd your-project
+buildstory init
+```
+
+See the [Configuration guide](/guides/configuration) for details on setting up projects.

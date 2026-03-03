@@ -1,0 +1,110 @@
+---
+title: "List API Keys"
+api: "GET /api/v1/api-keys"
+description: "Retrieve all API keys for the authenticated user, including active and revoked keys."
+---
+
+## Authentication
+
+Requires Supabase session authentication (dashboard users only).
+
+## Request
+
+No request parameters required.
+
+## Response
+
+<ResponseField name="keys" type="array" required>
+  Array of API key objects, ordered by creation date (newest first)
+  
+  <Expandable title="Key object properties">
+    <ResponseField name="id" type="string" required>
+      The unique identifier for the API key (prefixed with `ak_`)
+    </ResponseField>
+    
+    <ResponseField name="key_prefix" type="string" required>
+      The first 8 characters of the key for display purposes (e.g., `bsk_a1b2`)
+    </ResponseField>
+    
+    <ResponseField name="label" type="string" required>
+      The label for this key
+    </ResponseField>
+    
+    <ResponseField name="last_used_at" type="string | null" required>
+      ISO 8601 timestamp of last usage, or `null` if never used
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string" required>
+      ISO 8601 timestamp when the key was created
+    </ResponseField>
+    
+    <ResponseField name="revoked_at" type="string | null" required>
+      ISO 8601 timestamp when the key was revoked, or `null` if still active
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```bash
+curl https://buildstory-cli.vercel.app/api/v1/api-keys \
+  -H "Cookie: sb-access-token=YOUR_SESSION_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "keys": [
+    {
+      "id": "ak_a1b2c3d4e5f6g7h8",
+      "key_prefix": "bsk_1234",
+      "label": "Default",
+      "last_used_at": "2026-03-03T11:30:00.000Z",
+      "created_at": "2026-03-01T12:00:00.000Z",
+      "revoked_at": null
+    },
+    {
+      "id": "ak_z9y8x7w6v5u4t3s2",
+      "key_prefix": "bsk_abcd",
+      "label": "Default",
+      "last_used_at": "2026-02-28T15:45:00.000Z",
+      "created_at": "2026-02-15T10:00:00.000Z",
+      "revoked_at": "2026-03-01T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+## Notes
+
+- **Security**: The full API key value is never returned - only the `key_prefix` for identification
+- **RLS enforcement**: Row-level security automatically filters keys to only those owned by the authenticated user
+- **Empty state**: Returns an empty array if the user has no API keys
+- **Ordering**: Keys are sorted by creation date in descending order (newest first)
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+### 401 Unauthorized
+
+Returned when the request is not authenticated with a valid Supabase session.
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+### 500 Internal Server Error
+
+Returned when the database query fails.
+
+```json
+{
+  "error": "Internal server error"
+}
+```

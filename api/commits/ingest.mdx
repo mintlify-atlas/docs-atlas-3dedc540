@@ -1,0 +1,270 @@
+---
+title: 'Ingest Commit'
+description: 'POST /api/v1/ingest - Receive commit payloads from post-commit hooks'
+api: 'POST /api/v1/ingest'
+---
+
+## Overview
+
+The ingest endpoint receives commit data from the Buildstory post-commit hook. When a commit is made in a tracked repository, the hook extracts commit metadata, diff statistics, and file changes, then sends this payload to the server for processing and AI enrichment.
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+  Bearer token authentication using your Buildstory API key.
+  
+  Format: `Bearer bsk_...`
+</ParamField>
+
+## Request Body
+
+The request body must be a valid JSON payload matching the `CommitPayloadSchema`.
+
+<ParamField body="entry_id" type="string" required>
+  Unique entry identifier with format `e_[16-char-hex]`. Generated from commit timestamp, machine ID, and commit hash.
+</ParamField>
+
+<ParamField body="project_id" type="string" required>
+  Project identifier with `proj_` prefix. Must match a project owned by the authenticated user.
+</ParamField>
+
+<ParamField body="machine_id" type="string" required>
+  Unique identifier for the machine where the commit was made. Generated during `buildstory init`.
+</ParamField>
+
+<ParamField body="content_hash" type="string" required>
+  SHA-256 hash of the commit hash and files array, used for deduplication.
+</ParamField>
+
+<ParamField body="commit_data" type="object" required>
+  Git commit metadata.
+  
+  <ParamField body="commit_data.hash" type="string" required>
+    Full commit hash (SHA-1).
+  </ParamField>
+  
+  <ParamField body="commit_data.message" type="string" required>
+    Commit message (subject line).
+  </ParamField>
+  
+  <ParamField body="commit_data.timestamp" type="string" required>
+    ISO 8601 timestamp with timezone offset (e.g., `2024-03-15T14:23:45-07:00`).
+  </ParamField>
+  
+  <ParamField body="commit_data.author" type="string" required>
+    Author name and email in format `Name <email@example.com>`.
+  </ParamField>
+</ParamField>
+
+<ParamField body="diff_stats" type="object" required>
+  Aggregate diff statistics for the commit.
+  
+  <ParamField body="diff_stats.files_changed" type="number" required>
+    Total number of files changed. Must be >= 0.
+  </ParamField>
+  
+  <ParamField body="diff_stats.insertions" type="number" required>
+    Total lines inserted across all files. Must be >= 0.
+  </ParamField>
+  
+  <ParamField body="diff_stats.deletions" type="number" required>
+    Total lines deleted across all files. Must be >= 0.
+  </ParamField>
+</ParamField>
+
+<ParamField body="files" type="array" required>
+  Array of file changes in the commit. Respects `.buildstoryignore` patterns.
+  
+  <ParamField body="files[].path" type="string" required>
+    File path relative to repository root.
+  </ParamField>
+  
+  <ParamField body="files[].change_type" type="string" required>
+    Type of change. One of: `added`, `modified`, `deleted`, `renamed`.
+  </ParamField>
+  
+  <ParamField body="files[].insertions" type="number" required>
+    Lines inserted in this file. Must be >= 0.
+  </ParamField>
+  
+  <ParamField body="files[].deletions" type="number" required>
+    Lines deleted in this file. Must be >= 0.
+  </ParamField>
+</ParamField>
+
+<ParamField body="diff_summary" type="string">
+  Optional. Human-readable diff summary (first 50 lines of `git diff --stat`). Secrets are automatically redacted (API keys, tokens, private keys, connection strings, AWS keys).
+</ParamField>
+
+<ParamField body="environment" type="object">
+  Optional. Environment metadata detected by the hook.
+  
+  <ParamField body="environment.tool_detected" type="string">
+    Development tool detected (e.g., `cursor`, `vscode`). Detected via environment variables like `CURSOR_TRACE_ID` or `TERM_PROGRAM`.
+  </ParamField>
+  
+  <ParamField body="environment.shell" type="string">
+    Shell name (e.g., `bash`, `zsh`).
+  </ParamField>
+  
+  <ParamField body="environment.os" type="string">
+    Operating system (e.g., `Linux`, `Darwin`).
+  </ParamField>
+</ParamField>
+
+## Response
+
+<ResponseField name="status" type="string">
+  Response status. Returns `"ok"` on success.
+</ResponseField>
+
+<ResponseField name="entry_id" type="string">
+  Echo of the submitted entry ID for confirmation.
+</ResponseField>
+
+## Status Codes
+
+- **200** - Commit payload successfully received and queued for enrichment
+- **400** - Invalid JSON or schema validation failure
+- **401** - Missing or invalid bearer token
+- **403** - Authenticated user does not own the target project
+- **500** - Internal server error (database failure)
+
+## Example Request
+
+```bash
+curl -X POST https://buildstory-cli.vercel.app/api/v1/ingest \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer bsk_1234567890abcdef" \
+  -d '{
+    "entry_id": "e_a1b2c3d4e5f67890",
+    "project_id": "proj_example123",
+    "machine_id": "dev-macbook-pro",
+    "content_hash": "8f3b2a1c9d0e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a",
+    "commit_data": {
+      "hash": "abc123def456789012345678901234567890abcd",
+      "message": "Add user authentication flow",
+      "timestamp": "2024-03-15T14:23:45-07:00",
+      "author": "Jane Developer <jane@example.com>"
+    },
+    "diff_stats": {
+      "files_changed": 3,
+      "insertions": 127,
+      "deletions": 18
+    },
+    "files": [
+      {
+        "path": "src/auth/login.ts",
+        "change_type": "added",
+        "insertions": 89,
+        "deletions": 0
+      },
+      {
+        "path": "src/auth/middleware.ts",
+        "change_type": "modified",
+        "insertions": 32,
+        "deletions": 15
+      },
+      {
+        "path": "src/routes.ts",
+        "change_type": "modified",
+        "insertions": 6,
+        "deletions": 3
+      }
+    ],
+    "diff_summary": " src/auth/login.ts      | 89 ++++++++++++++++++++++++++++++++++++++++++++++++++\n src/auth/middleware.ts | 47 ++++++++++++++++----------\n src/routes.ts          |  9 +++--\n 3 files changed, 127 insertions(+), 18 deletions(-)",
+    "environment": {
+      "tool_detected": "cursor",
+      "shell": "zsh",
+      "os": "Darwin"
+    }
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "status": "ok",
+  "entry_id": "e_a1b2c3d4e5f67890"
+}
+```
+
+## Error Responses
+
+### Invalid JSON (400)
+
+```json
+{
+  "error": "Invalid JSON"
+}
+```
+
+### Schema Validation Failure (400)
+
+```json
+{
+  "error": "Invalid payload",
+  "details": {
+    "fieldErrors": {
+      "commit_data.timestamp": ["Invalid datetime"]
+    },
+    "formErrors": []
+  }
+}
+```
+
+### Unauthorized (401)
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+### Forbidden (403)
+
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+### Internal Server Error (500)
+
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+## Behavior
+
+1. **Authentication**: Validates bearer token against user API keys or legacy `BUILDSTORY_API_TOKEN` environment variable.
+
+2. **Schema Validation**: Parses and validates the request body against `CommitPayloadSchema`.
+
+3. **Ownership Check**: Verifies the authenticated user owns the target project (returns 403 if not).
+
+4. **Upsert**: Inserts or updates the entry in the `raw_entries` table using `entry_id` as the conflict key. Sets `enriched: false` and stores the current timestamp in `updated_at`.
+
+5. **Background Enrichment**: After responding with 200, triggers AI enrichment in the background using Next.js `after()`. This processes the raw commit data into human-readable updates without blocking the hook.
+
+6. **Deduplication**: Uses `content_hash` to detect duplicate payloads. The upsert operation ensures the same commit sent multiple times won't create duplicate entries.
+
+## Hook Integration
+
+This endpoint is called automatically by the Buildstory post-commit hook installed via `buildstory init`. The hook:
+
+- Runs in the background after each commit (non-blocking)
+- Reads configuration from `.buildstory/config.json` (project_id, endpoint, machine_id)
+- Reads API token from `~/.buildstory/credentials.json`
+- Respects `.buildstoryignore` patterns to exclude files from the `files` array
+- Redacts sensitive data (API keys, tokens, credentials) from `diff_summary`
+- Logs success/failure to `.buildstory/hook.log` with format: `[OK/FAIL/SKIP] entry_id http_status`
+- Timeout: 10 seconds via `curl --max-time 10`
+
+## Related Endpoints
+
+- [GET /api/v1/projects/:id](/api/projects/get) - View project details and pipeline stats
+- [POST /api/v1/projects/:id/entries/check](/api/projects/check-entries) - Check if commits were successfully delivered

@@ -1,0 +1,152 @@
+---
+title: "Get Public Timeline"
+api: "GET /api/v1/projects/{id}/timeline"
+description: "Retrieve approved updates grouped by day for public display"
+---
+
+## Authentication
+
+No authentication required. This endpoint returns only approved updates and is publicly accessible.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  Project ID (format: `proj_*`)
+</ParamField>
+
+## Response
+
+<ResponseField name="timeline" type="array">
+  Array of daily aggregates, sorted by date (newest first)
+  
+  <Expandable title="Daily aggregate properties">
+    <ResponseField name="date" type="string">
+      UTC date in YYYY-MM-DD format
+    </ResponseField>
+    
+    <ResponseField name="count" type="number">
+      Number of updates on this date
+    </ResponseField>
+    
+    <ResponseField name="entries" type="array">
+      Array of enriched update objects (same structure as draft objects, with status="approved")
+    </ResponseField>
+    
+    <ResponseField name="stats" type="object">
+      Aggregated statistics for the day
+      
+      <Expandable title="Stats properties">
+        <ResponseField name="files_changed" type="number">
+          Total files changed across all updates
+        </ResponseField>
+        
+        <ResponseField name="insertions" type="number">
+          Total lines inserted
+        </ResponseField>
+        
+        <ResponseField name="deletions" type="number">
+          Total lines deleted
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash
+curl -X GET https://buildstory-cli.vercel.app/api/v1/projects/proj_abc123/timeline
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+[
+  {
+    "date": "2026-03-03",
+    "count": 2,
+    "entries": [
+      {
+        "entry_id": "e_xyz789",
+        "project_id": "proj_abc123",
+        "title": "Add user authentication flow",
+        "description": "Implemented OAuth2 authentication with Google and GitHub providers.",
+        "decision": null,
+        "type": "feature",
+        "tags": ["auth", "oauth"],
+        "toolchain": ["next-auth"],
+        "status": "approved",
+        "timestamp": "2026-03-03T14:30:00Z",
+        "approved_at": "2026-03-03T15:00:00Z",
+        "stats": {
+          "files_changed": 8,
+          "insertions": 245,
+          "deletions": 12
+        }
+      },
+      {
+        "entry_id": "e_abc456",
+        "project_id": "proj_abc123",
+        "title": "Fix session timeout bug",
+        "description": "Resolved issue where sessions expired prematurely.",
+        "decision": null,
+        "type": "fix",
+        "tags": ["auth", "bugfix"],
+        "toolchain": ["typescript"],
+        "status": "approved",
+        "timestamp": "2026-03-03T16:20:00Z",
+        "approved_at": "2026-03-03T16:45:00Z",
+        "stats": {
+          "files_changed": 2,
+          "insertions": 15,
+          "deletions": 8
+        }
+      }
+    ],
+    "stats": {
+      "files_changed": 10,
+      "insertions": 260,
+      "deletions": 20
+    }
+  },
+  {
+    "date": "2026-03-02",
+    "count": 1,
+    "entries": [
+      {
+        "entry_id": "e_def789",
+        "project_id": "proj_abc123",
+        "title": "Refactor database queries",
+        "description": "Optimized database queries for better performance.",
+        "decision": null,
+        "type": "improvement",
+        "tags": ["database", "performance"],
+        "toolchain": ["postgresql"],
+        "status": "approved",
+        "timestamp": "2026-03-02T10:15:00Z",
+        "approved_at": "2026-03-02T11:00:00Z",
+        "stats": {
+          "files_changed": 5,
+          "insertions": 120,
+          "deletions": 95
+        }
+      }
+    ],
+    "stats": {
+      "files_changed": 5,
+      "insertions": 120,
+      "deletions": 95
+    }
+  }
+]
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message
+</ResponseField>
+
+| Status Code | Description |
+|-------------|-------------|
+| 500 | Internal server error |

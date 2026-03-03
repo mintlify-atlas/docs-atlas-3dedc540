@@ -1,0 +1,91 @@
+---
+title: 'CLI Overview'
+description: 'Command-line interface for Buildstory'
+icon: 'terminal'
+---
+
+The Buildstory CLI automatically captures the story of what you build by installing a git post-commit hook that sends commit metadata to the Buildstory server for AI enrichment.
+
+## Installation
+
+```bash
+npm install -g buildstory
+```
+
+## Requirements
+
+- Node.js >= 18
+- Git repository
+- Buildstory account
+
+## Quick Start
+
+```bash
+# Authenticate with Buildstory
+buildstory auth
+
+# Initialize in your git repository
+buildstory init
+
+# Check configuration and connectivity
+buildstory status
+```
+
+## Global Options
+
+<ParamField path="--version" type="flag">
+  Display the CLI version number
+</ParamField>
+
+<ParamField path="--help" type="flag">
+  Display help information for a command
+</ParamField>
+
+## Configuration Files
+
+The CLI creates and uses several configuration files:
+
+### Global Configuration
+
+**`~/.buildstory/credentials.json`**
+
+Stores your authentication token globally across all projects.
+
+### Project Configuration
+
+**`.buildstory/config.json`**
+
+Per-repository configuration created by `buildstory init`. Contains:
+- `project_id` - Unique project identifier
+- `endpoint` - API endpoint URL
+- `machine_id` - Unique machine identifier
+- `created_at` - Timestamp of initialization
+
+**`.buildstory/hook.log`**
+
+Logs post-commit hook activity with OK/FAIL/SKIP status entries. Auto-rotated at approximately 100KB.
+
+**`.buildstoryignore`**
+
+Glob patterns for files to exclude from commit data. Created with default patterns during `init`.
+
+## Environment Variables
+
+<ParamField path="BUILDSTORY_ENDPOINT" type="string" default="https://buildstory-cli.vercel.app">
+  Override the default API endpoint for all commands
+</ParamField>
+
+## Post-Commit Hook
+
+The `buildstory init` command installs a git post-commit hook that:
+
+- Runs in the background after each commit
+- Extracts commit metadata (hash, message, author, timestamp)
+- Collects diff summaries with secret redaction
+- Detects development environment (Cursor, VS Code)
+- Posts payload to `/api/v1/ingest` endpoint
+- Logs status to `.buildstory/hook.log`
+
+## Version
+
+Current version: **0.2.0**

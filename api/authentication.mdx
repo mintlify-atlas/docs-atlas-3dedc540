@@ -1,0 +1,218 @@
+---
+title: Authentication
+description: How to authenticate with the Buildstory API
+---
+
+## Overview
+
+The Buildstory API uses Bearer token authentication for CLI and programmatic access. API keys are user-scoped, meaning each user can generate and manage their own keys.
+
+## Authentication Methods
+
+There are two ways to authenticate with the API:
+
+1. **Per-user API keys** (recommended) - Modern, user-scoped keys that can be managed via the dashboard
+2. **Legacy shared token** - Environment variable-based token for backward compatibility (not recommended for new integrations)
+
+## API Key Format
+
+API keys use a `bsk_` prefix followed by a 32-character hexadecimal string:
+
+```
+bsk_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+```
+
+Keys are securely stored as SHA-256 hashes in the database. The raw key is only shown once during generation.
+
+## Obtaining an API Key
+
+### Method 1: Browser-Based Auth (Recommended)
+
+The easiest way to obtain an API key is using the CLI's browser-based authentication flow:
+
+```bash
+buildstory auth
+```
+
+This command will:
+1. Open your browser to the authentication page
+2. Prompt you to log in (if not already authenticated)
+3. Ask you to authorize the CLI
+4. Automatically save the API key to `~/.buildstory/credentials.json`
+
+### Method 2: Manual Token Entry
+
+If you're in a CI/CD environment or prefer manual token management, you can directly provide a token:
+
+```bash
+buildstory auth --token bsk_your_key_here
+```
+
+### Method 3: Dashboard Generation
+
+You can also generate API keys directly from the Buildstory web dashboard:
+
+1. Navigate to your [Dashboard](https://buildstory-cli.vercel.app/dashboard)
+2. Look for the "CLI Setup" section
+3. Click "Generate API Key"
+4. Copy the key immediately (it will only be shown once)
+
+Note: Generating a new key via the dashboard will revoke all existing active keys for your account.
+
+## Using API Keys
+
+### Authorization Header
+
+Include your API key in the `Authorization` header using the Bearer scheme:
+
+```
+Authorization: Bearer bsk_your_key_here
+```
+
+### Example: Health Check
+
+```bash
+curl -H "Authorization: Bearer bsk_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" \
+  https://buildstory-cli.vercel.app/api/v1/health
+```
+
+### Example: Create Project
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer bsk_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Project", "description": "Project description"}' \
+  https://buildstory-cli.vercel.app/api/v1/projects
+```
+
+### Example: Ingest Commit Data
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer bsk_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "entry_id": "e_abc123",
+    "project_id": "proj_xyz789",
+    "machine_id": "machine-abc",
+    "commit_data": {
+      "hash": "a1b2c3d4",
+      "message": "Add new feature",
+      "author": "John Doe",
+      "timestamp": "2026-03-03T12:00:00Z"
+    },
+    "diff_stats": {
+      "files_changed": 3,
+      "insertions": 42,
+      "deletions": 7
+    },
+    "files": ["src/feature.ts", "src/feature.test.ts", "README.md"]
+  }' \
+  https://buildstory-cli.vercel.app/api/v1/ingest
+```
+
+## API Key Management
+
+### Listing Your Keys
+
+To view all API keys associated with your account:
+
+```bash
+curl -H "Cookie: your-session-cookie" \
+  https://buildstory-cli.vercel.app/api/v1/api-keys
+```
+
+This endpoint requires Supabase session authentication (cookie-based), not Bearer token authentication.
+
+Response:
+
+```json
+{
+  "keys": [
+    {
+      "id": "ak_1a2b3c4d5e6f7a8b",
+      "key_prefix": "bsk_1a2b",
+      "label": "Default",
+      "last_used_at": "2026-03-03T12:00:00.000Z",
+      "created_at": "2026-03-01T10:00:00.000Z",
+      "revoked_at": null
+    }
+  ]
+}
+```
+
+### Revoking a Key
+
+To revoke an API key:
+
+```bash
+curl -X DELETE \
+  -H "Cookie: your-session-cookie" \
+  https://buildstory-cli.vercel.app/api/v1/api-keys/ak_1a2b3c4d5e6f7a8b
+```
+
+This endpoint also requires session authentication.
+
+## How API Keys Work
+
+When you make an authenticated request:
+
+1. The API extracts the Bearer token from the `Authorization` header
+2. The token is hashed using SHA-256
+3. The hash is looked up in the `api_keys` table
+4. If found and not revoked, the request is authenticated with the associated user ID
+5. The `last_used_at` timestamp is updated (fire-and-forget)
+6. If not found, the API falls back to checking the legacy `BUILDSTORY_API_TOKEN` environment variable
+
+## Security Best Practices
+
+- **Never commit API keys to version control**
+- Store keys in secure environment variables or credential managers
+- Revoke keys immediately if they are compromised
+- Use separate keys for different machines/environments when using the CLI browser auth flow
+- Regularly review and revoke unused keys via the dashboard
+
+## Project Ownership Verification
+
+When using user-scoped API keys, the API verifies that you own the project you're trying to access. For example:
+
+- Ingesting commit data requires that the authenticated user owns the target project
+- Accessing project details, drafts, and timelines requires ownership
+- Manual enrichment triggers require ownership
+
+Legacy shared tokens (environment variable-based) bypass ownership checks but return a `null` user ID.
+
+## Troubleshooting
+
+### 401 Unauthorized
+
+This error indicates:
+- Missing `Authorization` header
+- Malformed header (must be `Bearer <token>`)
+- Invalid or revoked API key
+
+### 403 Forbidden
+
+This error indicates:
+- Valid authentication, but you don't own the requested resource
+- For example, trying to ingest commits to another user's project
+
+### Key Not Working After Generation
+
+- Ensure you copied the entire key including the `bsk_` prefix
+- Check for extra whitespace or line breaks
+- Verify the key hasn't been revoked in the dashboard
+- For CLI usage, ensure the key is properly saved in `~/.buildstory/credentials.json`
+
+## CLI Credentials Storage
+
+The CLI stores your API key in `~/.buildstory/credentials.json`:
+
+```json
+{
+  "token": "bsk_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+}
+```
+
+This file is created with restricted permissions (user-only read/write) for security.
