@@ -1,0 +1,129 @@
+{
+  "projectType": "saas",
+  "projectName": "Buildstory",
+  "projectDescription": "Automatically capture the story of what you build with AI-enriched commit tracking and public project timelines",
+  "theme": "palm",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/ai-enrichment",
+              "features/dashboard",
+              "features/timeline",
+              "features/authentication"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/installation",
+              "guides/configuration",
+              "guides/workflow",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/auth",
+              "cli/init",
+              "cli/status"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "cli/credentials",
+              "cli/config-files",
+              "cli/buildstoryignore"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": ["api/overview", "api/authentication"]
+          },
+          {
+            "group": "Projects",
+            "pages": [
+              "api/projects/create",
+              "api/projects/get",
+              "api/projects/check-entries"
+            ]
+          },
+          {
+            "group": "Commits",
+            "pages": ["api/commits/ingest"]
+          },
+          {
+            "group": "Updates",
+            "pages": [
+              "api/updates/list-drafts",
+              "api/updates/timeline",
+              "api/updates/edit",
+              "api/updates/approve",
+              "api/updates/dismiss",
+              "api/updates/bulk-approve"
+            ]
+          },
+          {
+            "group": "API Keys",
+            "pages": [
+              "api/keys/create",
+              "api/keys/list",
+              "api/keys/revoke"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automatic git commit tracking via post-commit hooks",
+    "AI-powered enrichment of commits into human-readable updates",
+    "Web dashboard for reviewing and managing project updates",
+    "Public timeline for sharing your development journey",
+    "Browser-based CLI authentication flow",
+    "Secret redaction and configurable file exclusions",
+    "Multi-project support with per-user API keys"
+  ],
+  "publicApiSurface": [
+    "buildstory auth",
+    "buildstory init",
+    "buildstory status",
+    "POST /api/v1/ingest",
+    "POST /api/v1/projects",
+    "GET /api/v1/projects/[id]",
+    "POST /api/v1/projects/[id]/entries/check",
+    "GET /api/v1/projects/[id]/drafts",
+    "GET /api/v1/projects/[id]/timeline",
+    "PATCH /api/v1/updates/[entryId]",
+    "POST /api/v1/updates/[entryId]/approve",
+    "POST /api/v1/updates/[entryId]/dismiss",
+    "POST /api/v1/updates/bulk-approve",
+    "POST /api/v1/api-keys",
+    "GET /api/v1/api-keys",
+    "DELETE /api/v1/api-keys/[id]"
+  ]
+}
